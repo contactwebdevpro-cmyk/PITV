@@ -1242,7 +1242,7 @@ async function api(path, opts = {}) {
   try {
     const r = await fetch(SERVER_BASE + path, opts);
     if (!r.ok) return null;
-    return r.json();
+    return await r.json();
   } catch (e) {
     console.warn('API indisponible :', path);
     return null;
