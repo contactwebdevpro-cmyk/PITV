@@ -1309,9 +1309,11 @@ async function loadM3UDirect(url) {
   setStatus('Connexion à la source IPTV...');
 
   const needProxy = !IS_SERVER_MODE || location.protocol === 'file:';
-  const urlsToTry = needProxy
-    ? CORS_PROXIES.map(p => p(url))
-    : [url, ...CORS_PROXIES.map(p => p(url))];
+  // En mode serveur : /api/proxy d'abord (Node.js, sans CORS), puis proxies publics
+  // En standalone  : proxies publics uniquement
+  const urlsToTry = IS_SERVER_MODE
+    ? [`${SERVER_BASE}/api/proxy?url=${encodeURIComponent(url)}`, ...CORS_PROXIES.map(p => p(url))]
+    : CORS_PROXIES.map(p => p(url));
 
   let lastError = null;
 
