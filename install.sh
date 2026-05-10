@@ -156,6 +156,8 @@ detect_pi() {
     KIOSK_USER="pi"
   elif id "ubuntu" &>/dev/null; then
     KIOSK_USER="ubuntu"
+  elif id "admin" &>/dev/null; then
+    KIOSK_USER="admin"
   else
     KIOSK_USER=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 {print $1; exit}')
     if [[ -z "$KIOSK_USER" ]]; then KIOSK_USER="pitv"; fi
@@ -258,17 +260,62 @@ fi
 
 # ─── 5. CHROMIUM ────────────────────────────────────────────────────────────────
 step "Installation de Chromium"
-if command -v chromium-browser &>/dev/null || command -v chromium &>/dev/null; then
-  CHROMIUM_BIN=$(command -v chromium-browser || command -v chromium)
-  ok "Chromium déjà installé : ${CHROMIUM_BIN}"
-else
-  apt-get install -y chromium-browser 2>&1 | tail -5 || \
-  apt-get install -y chromium 2>&1 | tail -5
-  CHROMIUM_BIN=$(command -v chromium-browser || command -v chromium)
-  ok "Chromium installé"
+
+# Détecte le bon nom de paquet selon la distro/version
+# Raspberry Pi OS Bookworm (Debian 12+) : paquet "chromium"
+# Anciennes versions / Ubuntu : "chromium-browser"
+find_chromium_package() {
+  # Déjà installé ?
+  if command -v chromium &>/dev/null; then echo "installed:chromium"; return; fi
+  if command -v chromium-browser &>/dev/null; then echo "installed:chromium-browser"; return; fi
+
+  # Cherche quel paquet est disponible dans apt
+  if apt-cache show chromium &>/dev/null 2>&1; then
+    echo "pkg:chromium"
+  elif apt-cache show chromium-browser &>/dev/null 2>&1; then
+    echo "pkg:chromium-browser"
+  else
+    echo "none"
+  fi
+}
+
+CHROMIUM_PKG=$(find_chromium_package)
+
+case "$CHROMIUM_PKG" in
+  installed:*)
+    CHROMIUM_BIN=$(command -v chromium 2>/dev/null || command -v chromium-browser 2>/dev/null)
+    ok "Chromium déjà installé : ${CHROMIUM_BIN}"
+    ;;
+  pkg:chromium)
+    apt-get install -y chromium 2>&1 | tail -5
+    CHROMIUM_BIN=$(command -v chromium)
+    ok "Chromium installé (paquet: chromium)"
+    ;;
+  pkg:chromium-browser)
+    apt-get install -y chromium-browser 2>&1 | tail -5
+    CHROMIUM_BIN=$(command -v chromium-browser)
+    ok "Chromium installé (paquet: chromium-browser)"
+    ;;
+  none)
+    warn "Chromium non trouvé dans apt — tentative via snap..."
+    if command -v snap &>/dev/null; then
+      snap install chromium 2>&1 | tail -3
+      CHROMIUM_BIN=$(command -v chromium || echo "/snap/bin/chromium")
+      ok "Chromium installé via snap"
+    else
+      warn "Impossible d'installer Chromium automatiquement."
+      warn "Installez-le manuellement : sudo apt install chromium"
+      CHROMIUM_BIN="/usr/bin/chromium"
+    fi
+    ;;
+esac
+
+# Vérifie que le binaire existe vraiment
+if [[ ! -x "$CHROMIUM_BIN" ]]; then
+  CHROMIUM_BIN=$(command -v chromium 2>/dev/null || command -v chromium-browser 2>/dev/null || echo "/usr/bin/chromium")
 fi
 
-CHROMIUM_BIN=$(command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || echo "/usr/bin/chromium-browser")
+ok "Binaire Chromium : ${CHROMIUM_BIN}"
 
 # ─── 6. PLYMOUTH (boot splash) — Raspberry Pi uniquement ─────────────────────
 if [[ "$IS_PI" == "true" ]]; then
@@ -427,8 +474,7 @@ npm install --production 2>&1 | tail -5
 ok "Dépendances npm installées"
 
 # Permissions
-chown -R "${PITV_USER}:${PITV_USER}" "${PITV_DIR}" 2>/dev/null || \
-  chown -R "${KIOSK_USER}:${KIOSK_USER}" "${PITV_DIR}"
+chown -R "${KIOSK_USER}:${KIOSK_USER}" "${PITV_DIR}" 2>/dev/null || true
 
 # ─── 10. SCRIPT DE DÉMARRAGE KIOSK ────────────────────────────────────────────
 step "Configuration du mode kiosque"
@@ -497,21 +543,6 @@ ok "Script kiosque créé"
 if [[ "$HAS_DESKTOP" == "false" ]]; then
   step "Configuration d'Openbox"
   mkdir -p /etc/xdg/openbox
-
-  cat > /etc/xdg/openbox/autostart << OBAUTO
-# PiTV OS Openbox autostart
-# Démarrage du navigateur kiosque
-/opt/pitv/start-kiosk.sh &
-OBAUTO
-
-  cat > "${PITV_DIR}/start-kiosk.sh" << KIOSK2
-#!/bin/bash
-# PiTV OS - Démarrage X + Openbox en mode kiosque
-
-# Lancer openbox sans gestionnaire de fichiers
-exec openbox-session
-
-KIOSK2
 
   # Vrai script de démarrage X
   cat > /etc/xdg/openbox/autostart << OBFULL
