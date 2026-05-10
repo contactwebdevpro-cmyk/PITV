@@ -1030,9 +1030,14 @@ header {
 
   <div class="player-spinner"></div>
   <div id="player-error">
-    <div class="player-error-icon">📡</div>
-    <div class="player-error-msg">Impossible de charger le flux</div>
-    <button class="player-btn" onclick="retryStream()">↺ Réessayer</button>
+    <div class="player-error-icon" id="player-error-icon">📡</div>
+    <div class="player-error-msg" id="player-error-msg">Impossible de charger le flux</div>
+    <div id="player-error-sub" style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:16px;max-width:420px;text-align:center;line-height:1.5"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <button class="player-btn" onclick="retryStream()">↺ Réessayer</button>
+      <button class="player-btn" id="open-in-tab-btn" style="display:none" onclick="openStreamInTab()">↗ Ouvrir dans un onglet</button>
+      <button class="player-btn" onclick="nextChannel()">⏭ Chaîne suivante</button>
+    </div>
   </div>
 
   <div id="player-controls">
@@ -1222,8 +1227,16 @@ const SERVER_BASE = IS_SERVER_MODE
   ? `${location.protocol}//${location.host}`
   : '';
 
-// Source M3U par défaut chargée en mode standalone
-const DEFAULT_M3U_URL = 'https://iptv-org.github.io/iptv/index.m3u';
+// Source M3U par défaut — liste allégée France (plus rapide qu'index.m3u complet)
+// L'utilisateur peut changer ça dans Paramètres > Système
+const DEFAULT_M3U_URL = 'https://iptv-org.github.io/iptv/languages/fra.m3u';
+
+// Proxies CORS de secours (essayés dans l'ordre en cas d'échec)
+const CORS_PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://cors.sh/${url}`,
+];
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
@@ -1292,36 +1305,130 @@ async function loadChannels() {
 }
 
 async function loadM3UDirect(url) {
-  const status = document.getElementById('boot-status');
-  if (status) status.textContent = 'Chargement des chaînes IPTV...';
+  const statusEl = document.getElementById('boot-status');
+  const setStatus = t => { if (statusEl) statusEl.textContent = t; };
 
-  try {
-    // Utilise un proxy CORS public si nécessaire
-    // En mode fichier local le navigateur bloque le CORS → on utilise un proxy
-    let fetchUrl = url;
-    let usedProxy = false;
-    if (!IS_SERVER_MODE || location.protocol === 'file:') {
-      fetchUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
-      usedProxy = true;
+  setStatus('Connexion à la source IPTV...');
+
+  const needProxy = !IS_SERVER_MODE || location.protocol === 'file:';
+  const urlsToTry = needProxy
+    ? CORS_PROXIES.map(p => p(url))
+    : [url, ...CORS_PROXIES.map(p => p(url))];
+
+  let lastError = null;
+
+  for (let i = 0; i < urlsToTry.length; i++) {
+    const fetchUrl = urlsToTry[i];
+    const label = (i === 0 && !needProxy) ? 'directe' : `proxy ${i + (needProxy ? 1 : 0)}`;
+    setStatus(`Chargement ${label}...`);
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+
+      const resp = await fetch(fetchUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+      setStatus('Réception des données...');
+
+      // ── Lecture progressive du flux de réponse ──────────────────────────
+      // Au lieu d'attendre tout le fichier, on parse au fur et à mesure
+      // et on affiche les chaînes dès qu'on en a assez
+      const reader = resp.body?.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let current = null;
+      let id = 0;
+      const channels = [];
+      let firstBatchDone = false;
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Parse toutes les lignes complètes
+          const newline = buffer.lastIndexOf('\n');
+          if (newline < 0) continue;
+          const chunk = buffer.slice(0, newline + 1);
+          buffer = buffer.slice(newline + 1);
+
+          for (const raw of chunk.split('\n')) {
+            const line = raw.trim();
+            if (!line) continue;
+
+            if (line.startsWith('#EXTINF:')) {
+              current = { id: 'ch_' + (++id), name: '', group: 'Autres', country: '', logo: '', url: '' };
+              const comma = line.lastIndexOf(',');
+              current.name = comma >= 0 ? line.slice(comma + 1).trim() : 'Chaîne ' + id;
+              const m = (pat) => line.match(pat);
+              const tvgName    = m(/tvg-name="([^"]*)"/i);
+              const tvgLogo    = m(/tvg-logo="([^"]*)"/i);
+              const group      = m(/group-title="([^"]*)"/i);
+              const tvgId      = m(/tvg-id="([^"]*)"/i);
+              const tvgCountry = m(/tvg-country="([^"]*)"/i);
+              if (tvgName)    current.name    = tvgName[1]    || current.name;
+              if (tvgLogo)    current.logo    = tvgLogo[1];
+              if (group)      current.group   = group[1]      || 'Autres';
+              if (tvgId)      current.id      = 'ch_' + tvgId[1].replace(/[^a-z0-9]/gi,'_') + '_' + id;
+              if (tvgCountry) current.country = tvgCountry[1];
+
+            } else if (current && !line.startsWith('#') && /^https?:|^rtmps?:|^rtsp:/.test(line)) {
+              current.url = line;
+              channels.push(current);
+              current = null;
+
+              // Affiche les 60 premières chaînes sans attendre la fin
+              if (!firstBatchDone && channels.length >= 60) {
+                firstBatchDone = true;
+                state.channels = [...channels];
+                renderCategories();
+                loadFavorites().then(() => {});
+                renderView();
+                setStatus(`${channels.length} chaînes chargées, suite en cours...`);
+              }
+            }
+          }
+        }
+        // Parse le reste du buffer
+        if (buffer.trim() && current) {
+          const line = buffer.trim();
+          if (/^https?:|^rtmps?:|^rtsp:/.test(line)) {
+            current.url = line;
+            channels.push(current);
+          }
+        }
+      } else {
+        // Fallback : text() classique si ReadableStream non dispo
+        const text = await resp.text();
+        channels.push(...parseM3U(text));
+      }
+
+      if (channels.length === 0) throw new Error('Aucune chaîne trouvée');
+
+      // Mise à jour finale
+      state.channels = channels;
+      renderCategories();
+      await loadFavorites();
+      renderView();
+      notify('📡', `${channels.length} chaînes chargées`, i > 0 || needProxy ? 'via proxy' : '');
+      return;
+
+    } catch (e) {
+      lastError = e;
+      console.warn(`Tentative ${label} échouée :`, e.message);
     }
-
-    const resp = await fetch(fetchUrl);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const text = await resp.text();
-    const channels = parseM3U(text);
-    state.channels = channels;
-    renderCategories();
-    await loadFavorites();
-    renderView();
-    if (usedProxy) notify('📡', 'Chaînes chargées via proxy', `${channels.length} chaînes (mode standalone)`);
-  } catch (e) {
-    console.error('Erreur chargement M3U :', e);
-    state.channels = [];
-    renderCategories();
-    await loadFavorites();
-    renderView();
-    notify('⚠️', 'Impossible de charger les chaînes', 'Vérifiez votre connexion Internet');
   }
+
+  // Échec total
+  state.channels = [];
+  renderCategories();
+  await loadFavorites();
+  renderView();
+  notify('⚠️', 'Chargement échoué', 'Changez la source M3U dans ⚙ Paramètres > Système');
 }
 
 // ─── PARSEUR M3U INTÉGRÉ ──────────────────────────────────────────────────────
@@ -1661,63 +1768,128 @@ function playChannel(ch) {
   startStream(ch.url);
 }
 
+function showPlayerError(msg, sub = '', isCors = false) {
+  const overlay = document.getElementById('player-overlay');
+  overlay.classList.remove('buffering');
+  overlay.classList.add('error');
+  document.getElementById('player-error-icon').textContent = isCors ? '🔒' : '📡';
+  document.getElementById('player-error-msg').textContent = msg;
+  document.getElementById('player-error-sub').textContent = sub;
+  const openBtn = document.getElementById('open-in-tab-btn');
+  if (openBtn) openBtn.style.display = isCors ? 'flex' : 'none';
+}
+
+function openStreamInTab() {
+  if (state.currentChannel?.url) {
+    window.open(state.currentChannel.url, '_blank');
+  }
+}
+
 function startStream(url) {
   const video = document.getElementById('video-el');
   const overlay = document.getElementById('player-overlay');
 
   overlay.classList.remove('error');
   overlay.classList.add('buffering');
+  document.getElementById('player-error-sub').textContent = '';
+  const openBtn = document.getElementById('open-in-tab-btn');
+  if (openBtn) openBtn.style.display = 'none';
 
-  if (state.hls) {
-    state.hls.destroy();
-    state.hls = null;
-  }
+  // Nettoie le player précédent
+  if (state.hls) { state.hls.destroy(); state.hls = null; }
+  video.removeAttribute('src');
+  video.load();
 
   video.volume = state.volume / 100;
+  video.muted = state.isMuted;
 
-  if (Hls.isSupported() && (url.includes('.m3u8') || url.includes('/stream') || !url.includes('.'))) {
+  if (Hls.isSupported()) {
     const hls = new Hls({
-      enableWorker: false,
-      lowLatencyMode: true,
-      backBufferLength: 90,
-      maxBufferLength: 30,
+      enableWorker: true,
+      lowLatencyMode: false,
+      backBufferLength: 30,
+      maxBufferLength: 20,
+      maxMaxBufferLength: 60,
+      // Timeouts réduits pour échouer vite sur les flux morts
+      manifestLoadingTimeOut: 8000,
+      manifestLoadingMaxRetry: 1,   // 1 seul retry : évite 30s d'attente inutile
+      levelLoadingTimeOut: 8000,
+      levelLoadingMaxRetry: 1,
+      fragLoadingTimeOut: 10000,
+      fragLoadingMaxRetry: 2,
     });
+
     state.hls = hls;
     hls.loadSource(url);
     hls.attachMedia(video);
+
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       overlay.classList.remove('buffering');
-      video.play().catch(() => {});
+      video.play().catch(() => {
+        document.getElementById('play-pause-btn').textContent = '▶';
+      });
     });
+
     hls.on(Hls.Events.ERROR, (ev, data) => {
-      if (data.fatal) {
-        overlay.classList.remove('buffering');
-        overlay.classList.add('error');
+      if (!data.fatal) return; // erreurs non-fatales : HLS.js gère seul
+
+      const isCorsError = data.response?.code === 0 ||
+        (data.networkDetails && data.networkDetails.status === 0) ||
+        data.details === 'manifestLoadError' ||
+        data.details === 'levelLoadError';
+
+      hls.destroy(); state.hls = null;
+
+      if (isCorsError) {
+        // Erreur réseau code 0 = bloqué par CORS ou flux mort
+        // On tente d'abord la lecture native avant de déclarer CORS
+        video.src = url;
+        video.load();
+        video.play()
+          .then(() => overlay.classList.remove('buffering'))
+          .catch(() => {
+            showPlayerError(
+              'Flux bloqué (CORS)',
+              `Ce flux (${new URL(url).hostname}) interdit les lectures depuis un navigateur.\nSolution : installer le serveur Node.js (Raspberry Pi/Linux) qui proxy les flux.`,
+              true
+            );
+          });
+      } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        hls.recoverMediaError?.();
+      } else {
+        showPlayerError('Flux indisponible', 'Ce flux est peut-être hors ligne ou le format n\'est pas supporté.');
       }
     });
+
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari / iOS natif
     video.src = url;
+    video.load();
     video.addEventListener('loadedmetadata', () => {
       overlay.classList.remove('buffering');
       video.play().catch(() => {});
-    });
+    }, { once: true });
     video.addEventListener('error', () => {
-      overlay.classList.remove('buffering');
-      overlay.classList.add('error');
-    });
+      showPlayerError('Flux indisponible', 'Format non supporté sur ce navigateur.');
+    }, { once: true });
+
   } else {
-    // Try direct
-    video.src = url;
-    video.play().then(() => {
-      overlay.classList.remove('buffering');
-    }).catch(() => {
-      overlay.classList.remove('buffering');
-      overlay.classList.add('error');
-    });
+    tryNativePlayback(url);
   }
 
   video.onwaiting = () => overlay.classList.add('buffering');
-  video.onplaying = () => overlay.classList.remove('buffering');
+  video.onplaying  = () => overlay.classList.remove('buffering');
+}
+
+// Lecture native (MP4, TS direct, etc.)
+function tryNativePlayback(url) {
+  const video = document.getElementById('video-el');
+  const overlay = document.getElementById('player-overlay');
+  video.src = url;
+  video.load();
+  video.play()
+    .then(() => overlay.classList.remove('buffering'))
+    .catch(() => showPlayerError('Flux indisponible', 'Ce flux est hors ligne ou le format n\'est pas supporté.'));
 }
 
 function showPlayer() {
@@ -2008,16 +2180,32 @@ const SETTINGS_PANELS = {
     </div>
     <div class="settings-group">
       <div class="settings-group-title">Source IPTV (M3U)</div>
-      <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+      <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:10px;padding:16px">
         <div class="setting-label">
-          <div class="setting-name">URL de la liste M3U</div>
-          <div class="setting-desc">Source iptv-org ou liste personnalisée</div>
+          <div class="setting-name">Listes prédéfinies</div>
+          <div class="setting-desc">Cliquez pour sélectionner</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;width:100%">
+          ${[
+            ['🇫🇷 France uniquement', 'https://iptv-org.github.io/iptv/languages/fra.m3u'],
+            ['🇬🇧 English channels', 'https://iptv-org.github.io/iptv/languages/eng.m3u'],
+            ['🌍 Monde entier (lent)', 'https://iptv-org.github.io/iptv/index.m3u'],
+            ['📺 Francophones (FR+BE+CH)', 'https://iptv-org.github.io/iptv/languages/fra.m3u'],
+          ].map(([label, url]) => `
+            <button onclick="document.getElementById('m3u-url-input').value='${url}'"
+              style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;color:var(--text-dim);font-family:'Rajdhani',sans-serif;font-size:13px;cursor:pointer;text-align:left;transition:var(--transition)"
+              onmouseover="this.style.borderColor='rgba(0,229,255,0.4)';this.style.color='var(--text)'"
+              onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">${label}</button>`).join('')}
+        </div>
+        <div class="setting-label" style="margin-top:4px">
+          <div class="setting-name">URL personnalisée</div>
+          <div class="setting-desc">Votre propre liste M3U ou IPTV payant</div>
         </div>
         <input type="text" id="m3u-url-input"
           value="${state.settings?.iptv?.m3uUrl || DEFAULT_M3U_URL}"
-          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none"
           placeholder="https://...">
-        <button onclick="applyM3UUrl()" style="background:var(--accent);border:none;border-radius:var(--radius-sm);padding:6px 16px;color:var(--bg);font-family:'Rajdhani',sans-serif;font-weight:700;cursor:pointer;font-size:13px">
+        <button onclick="applyM3UUrl()" style="background:var(--accent);border:none;border-radius:var(--radius-sm);padding:8px 20px;color:var(--bg);font-family:'Rajdhani',sans-serif;font-weight:700;cursor:pointer;font-size:14px;letter-spacing:0.05em">
           ↻ Appliquer &amp; Recharger
         </button>
       </div>
