@@ -1182,37 +1182,35 @@ async function runBoot() {
   const status = document.getElementById('boot-status');
   const tagline = document.getElementById('boot-tagline');
 
-  // Affiche le mode de fonctionnement
   if (tagline) {
     tagline.textContent = IS_SERVER_MODE
       ? `Mode Serveur — ${location.host}`
       : 'Mode Standalone · Fonctionne sans serveur';
   }
 
-  for (let i = 0; i < bootSteps.length - 1; i++) {
-    const step = bootSteps[i];
+  // Toutes les étapes défilent rapidement
+  for (const step of bootSteps) {
     fill.style.width = step.p + '%';
     status.textContent = step.label;
-    await sleep(280 + Math.random() * 200);
+    await sleep(200 + Math.random() * 150);
   }
 
-  // Load settings
+  // Chargement des paramètres seulement (rapide, local)
   await loadSettings();
-
-  // Load channels
-  status.textContent = 'Chargement des chaînes...';
-  await loadChannels();
 
   fill.style.width = '100%';
   status.textContent = 'Prêt !';
-  await sleep(400);
+  await sleep(350);
 
-  // Fade out boot
+  // ✅ On affiche l'interface AVANT de charger les chaînes
   document.getElementById('boot-screen').classList.add('fade-out');
   await sleep(800);
   document.getElementById('boot-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
   state.isLoaded = true;
+
+  // ✅ Les chaînes chargent en arrière-plan (pas de await ici)
+  loadChannels();
 }
 
 // ─── MODE DÉTECTION ───────────────────────────────────────────────────────────
