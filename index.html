@@ -3,2656 +3,1277 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PiTV OS</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js"></script>
+<title>PiTV Lite</title>
 <style>
-/* ═══════════════════════════════════════════════════════════════
-   VARIABLES & RESET
-═══════════════════════════════════════════════════════════════ */
+/* ── ZERO animations, zero backdrop-filter, zero transforms, zero Google Fonts ── */
 :root {
-  --bg: #07090f;
-  --bg2: #0c0f1a;
-  --bg3: #111827;
-  --bg-card: rgba(255,255,255,0.04);
-  --bg-card-hover: rgba(255,255,255,0.08);
-  --accent: #00e5ff;
-  --accent2: #ff5c35;
-  --accent3: #a78bfa;
-  --text: #e8eaf0;
-  --text-dim: #8892a4;
-  --text-faint: #3d4860;
-  --border: rgba(255,255,255,0.07);
-  --border-accent: rgba(0,229,255,0.3);
-  --glow: 0 0 20px rgba(0,229,255,0.4);
-  --glow-sm: 0 0 8px rgba(0,229,255,0.3);
-  --sidebar-w: 220px;
-  --header-h: 64px;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+  --bg:    #0a0c10;
+  --bg2:   #111418;
+  --bg3:   #181c22;
+  --line:  #252930;
+  --acc:   #00d4e8;
+  --acc2:  #ff5533;
+  --txt:   #d8dce6;
+  --dim:   #6b7585;
+  --faint: #2e3340;
 }
 
-*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 16px;
-  line-height: 1.4;
+html, body {
+  height: 100%; width: 100%;
   overflow: hidden;
-  height: 100vh;
-  width: 100vw;
-  user-select: none;
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   BOOT SCREEN
-═══════════════════════════════════════════════════════════════ */
-#boot-screen {
-  position: fixed; inset: 0; z-index: 9999;
+  /* Polices système = zéro requête réseau, rendu natif */
+  font-family: ui-monospace, 'Courier New', monospace;
+  font-size: 14px;
   background: var(--bg);
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  transition: opacity 0.8s ease, transform 0.8s ease;
-}
-#boot-screen.fade-out { opacity: 0; transform: scale(1.05); pointer-events: none; }
-
-.boot-logo {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 72px; font-weight: 900;
-  letter-spacing: 0.08em;
-  background: linear-gradient(135deg, var(--accent), #0077ff, var(--accent));
-  background-size: 200% 200%;
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: logoShimmer 3s ease infinite, logoIn 0.8s ease forwards;
-  opacity: 0;
-}
-@keyframes logoShimmer {
-  0%,100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-@keyframes logoIn {
-  from { opacity: 0; transform: translateY(20px) scale(0.95); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  color: var(--txt);
+  /* Désactive le lissage subpixel (coûteux sur Pi) */
+  -webkit-font-smoothing: none;
 }
 
-.boot-tagline {
-  font-size: 14px; letter-spacing: 0.3em; color: var(--text-dim);
-  margin-top: 12px; text-transform: uppercase;
-  animation: fadeInUp 0.8s 0.3s ease forwards; opacity: 0;
-}
-
-.boot-progress-wrap {
-  margin-top: 60px; width: 280px;
-  animation: fadeInUp 0.8s 0.5s ease forwards; opacity: 0;
-}
-.boot-progress-label {
-  font-size: 11px; letter-spacing: 0.2em; color: var(--text-faint);
-  text-transform: uppercase; margin-bottom: 8px;
-  font-family: 'JetBrains Mono', monospace;
-}
-.boot-progress-bar {
-  height: 2px; background: var(--bg3);
-  border-radius: 2px; overflow: hidden;
-}
-.boot-progress-fill {
-  height: 100%; background: linear-gradient(90deg, #0077ff, var(--accent));
-  width: 0%; transition: width 0.4s ease;
-  box-shadow: var(--glow-sm);
-}
-.boot-status {
-  font-size: 12px; color: var(--text-faint); margin-top: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  min-height: 18px;
-}
-
-.boot-dots {
-  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
-}
-.boot-dot {
-  position: absolute; width: 2px; height: 2px;
-  background: var(--accent); border-radius: 50%;
-  opacity: 0; animation: dotFloat linear infinite;
-}
-@keyframes dotFloat {
-  0% { opacity:0; transform: translateY(0); }
-  10% { opacity: 0.6; }
-  90% { opacity: 0.2; }
-  100% { opacity: 0; transform: translateY(-100vh); }
-}
-@keyframes fadeInUp {
-  from { opacity:0; transform: translateY(12px); }
-  to { opacity:1; transform: translateY(0); }
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   MAIN APP LAYOUT
-═══════════════════════════════════════════════════════════════ */
+/* ── LAYOUT ────────────────────────────────────────────────────────── */
 #app {
-  display: flex; flex-direction: column;
-  width: 100vw; height: 100vh;
-  opacity: 0; transition: opacity 0.5s ease;
-}
-#app.visible { opacity: 1; }
-
-/* Background grid texture */
-#app::before {
-  content: '';
-  position: fixed; inset: 0; pointer-events: none;
-  background-image:
-    linear-gradient(rgba(0,229,255,0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,229,255,0.015) 1px, transparent 1px);
-  background-size: 40px 40px;
-  z-index: 0;
+  display: grid;
+  grid-template-rows: 44px 1fr;
+  grid-template-columns: 180px 1fr;
+  height: 100vh;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   HEADER
-═══════════════════════════════════════════════════════════════ */
+/* ── HEADER ──────────────────────────────────────────────────────────
+   AUCUN backdrop-filter, AUCUN blur, fond plein */
 header {
-  height: var(--header-h);
-  display: flex; align-items: center;
-  padding: 0 24px;
-  background: linear-gradient(180deg, rgba(7,9,15,0.95) 0%, rgba(7,9,15,0.6) 100%);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(20px);
-  position: relative; z-index: 100; flex-shrink: 0;
-  gap: 20px;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--line);
+  height: 44px;
 }
 
-.header-logo {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 22px; font-weight: 900;
-  background: linear-gradient(135deg, var(--accent), #4db8ff);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: 0.05em;
+.logo {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--acc);
+  letter-spacing: 2px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+#search {
+  flex: 1;
+  max-width: 320px;
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 4px 8px;
+  color: var(--txt);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+#search:focus { border-color: var(--acc); }
+#search::placeholder { color: var(--faint); }
+
+#clock {
+  margin-left: auto;
+  font-size: 15px;
+  color: var(--txt);
   flex-shrink: 0;
 }
 
-.header-search {
-  flex: 1; max-width: 400px;
-  display: flex; align-items: center;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  padding: 0 16px; gap: 10px;
-  transition: var(--transition);
-}
-.header-search:focus-within {
-  border-color: var(--border-accent);
-  box-shadow: var(--glow-sm);
-}
-.header-search input {
-  background: none; border: none; outline: none;
-  color: var(--text); font-family: 'Rajdhani', sans-serif;
-  font-size: 15px; width: 100%; padding: 8px 0;
-}
-.header-search input::placeholder { color: var(--text-faint); }
-.search-icon { color: var(--text-dim); font-size: 16px; flex-shrink: 0; }
-
-.header-spacer { flex: 1; }
-
-.header-info {
-  display: flex; align-items: center; gap: 20px;
+#ch-count {
+  font-size: 11px;
+  color: var(--dim);
+  flex-shrink: 0;
 }
 
-.header-clock {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 18px; font-weight: 700;
-  color: var(--text);
+.hbtn {
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 4px 8px;
+  color: var(--dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  flex-shrink: 0;
 }
-.header-date {
-  font-size: 12px; color: var(--text-dim);
-  letter-spacing: 0.1em; text-align: right;
-}
+.hbtn:hover { color: var(--acc); border-color: var(--acc); }
 
-.header-status {
-  display: flex; gap: 8px; align-items: center;
-}
-.status-pill {
-  display: flex; align-items: center; gap: 6px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 20px; padding: 5px 12px;
-  font-size: 12px; color: var(--text-dim);
-  letter-spacing: 0.05em;
-}
-.status-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 6px #22c55e;
-  animation: pulse 2s ease infinite;
-}
-@keyframes pulse {
-  0%,100% { opacity:1; } 50% { opacity:0.5; }
-}
-
-.icon-btn {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 8px 12px;
-  color: var(--text-dim); cursor: pointer;
-  transition: var(--transition); font-size: 18px;
-  display: flex; align-items: center; justify-content: center;
-}
-.icon-btn:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-accent);
-  color: var(--accent);
-  box-shadow: var(--glow-sm);
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   MAIN LAYOUT (sidebar + content)
-═══════════════════════════════════════════════════════════════ */
-.main-layout {
-  display: flex; flex: 1; overflow: hidden; position: relative; z-index: 1;
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   SIDEBAR
-═══════════════════════════════════════════════════════════════ */
+/* ── SIDEBAR ─────────────────────────────────────────────────────────
+   Liste simple, aucun effet */
 #sidebar {
-  width: var(--sidebar-w); flex-shrink: 0;
-  background: linear-gradient(180deg, rgba(12,15,26,0.9) 0%, rgba(7,9,15,0.9) 100%);
-  border-right: 1px solid var(--border);
-  display: flex; flex-direction: column;
-  overflow: hidden; backdrop-filter: blur(10px);
+  background: var(--bg2);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  /* Scrollbar fine */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--line); }
 
-.sidebar-section { padding: 16px 12px 8px; }
 .sidebar-label {
-  font-size: 10px; letter-spacing: 0.25em; color: var(--text-faint);
-  text-transform: uppercase; padding: 0 8px; margin-bottom: 4px;
+  padding: 8px 10px 4px;
+  font-size: 10px;
+  color: var(--faint);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
 }
 
-.nav-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px; border-radius: var(--radius-sm);
-  cursor: pointer; transition: var(--transition);
-  font-size: 14px; font-weight: 500; color: var(--text-dim);
-  letter-spacing: 0.03em; position: relative;
+.nav-item, .cat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--dim);
+  cursor: pointer;
+  border-bottom: 1px solid var(--faint);
+  /* PAS de transition — coûteuse sur Pi */
 }
-.nav-item:hover {
-  background: var(--bg-card-hover);
-  color: var(--text);
-}
-.nav-item.active {
-  background: linear-gradient(135deg, rgba(0,229,255,0.12), rgba(0,119,255,0.08));
-  color: var(--accent);
-  border: 1px solid rgba(0,229,255,0.2);
-}
-.nav-item.active .nav-icon { color: var(--accent); }
-.nav-icon { font-size: 18px; width: 20px; text-align: center; flex-shrink: 0; }
-.nav-badge {
-  margin-left: auto; background: var(--accent2);
-  color: white; border-radius: 10px; padding: 1px 7px;
-  font-size: 10px; font-weight: 700; min-width: 20px; text-align: center;
-}
+.nav-item:hover, .cat-item:hover { color: var(--txt); background: var(--bg3); }
+.nav-item.active { color: var(--acc); background: var(--bg3); border-left: 2px solid var(--acc); }
+.cat-item.active { color: var(--acc); }
 
-.sidebar-divider {
-  height: 1px; background: var(--border); margin: 8px 16px;
-}
-
-#categories-list {
-  flex: 1; overflow-y: auto; padding: 0 12px 12px;
-}
-#categories-list::-webkit-scrollbar { width: 4px; }
-#categories-list::-webkit-scrollbar-track { background: transparent; }
-#categories-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-.cat-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; border-radius: var(--radius-sm);
-  cursor: pointer; transition: var(--transition);
-  font-size: 13px; color: var(--text-dim);
-}
-.cat-item:hover { background: var(--bg-card-hover); color: var(--text); }
-.cat-item.active { color: var(--accent); }
 .cat-count {
-  margin-left: auto; font-size: 11px;
-  color: var(--text-faint); font-family: 'JetBrains Mono', monospace;
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--faint);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   CONTENT AREA
-═══════════════════════════════════════════════════════════════ */
+/* ── CONTENT ─────────────────────────────────────────────────────────*/
 #content {
-  flex: 1; overflow-y: auto; padding: 24px;
-  display: flex; flex-direction: column; gap: 28px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
-#content::-webkit-scrollbar { width: 6px; }
-#content::-webkit-scrollbar-track { background: transparent; }
-#content::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+#content::-webkit-scrollbar { width: 4px; }
+#content::-webkit-scrollbar-thumb { background: var(--line); }
 
-.section-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 16px;
+/* ── CHANNEL LIST (liste verticale, PAS de grille)
+   La grille avec images = reflow constant = lag sur Pi
+   On utilise une liste plate, images désactivables ────────────────── */
+#channels-wrap {
+  padding: 8px;
 }
-.section-title {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 20px; font-weight: 700;
-  color: var(--text); letter-spacing: 0.05em;
-  display: flex; align-items: center; gap: 10px;
+
+.section-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line);
 }
-.section-title::before {
-  content: '';
-  display: block; width: 3px; height: 18px;
-  background: linear-gradient(180deg, var(--accent), #0077ff);
+.section-bar-title {
+  font-size: 13px;
+  color: var(--acc);
+  letter-spacing: 1px;
+}
+.section-bar-count {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+/* Chaque chaîne = une ligne plate, aucun effet 3D */
+.ch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--faint);
+  cursor: pointer;
+  /* will-change: none — évite les couches GPU inutiles */
+}
+.ch-row:hover { background: var(--bg3); }
+.ch-row.playing { border-left: 2px solid var(--acc); background: var(--bg2); }
+
+/* Logo : taille fixe, chargement lazy, pas de drop-shadow */
+.ch-logo {
+  width: 32px;
+  height: 20px;
+  object-fit: contain;
+  background: var(--bg3);
+  flex-shrink: 0;
   border-radius: 2px;
 }
-.section-count {
-  font-size: 13px; color: var(--text-faint);
-  font-family: 'JetBrains Mono', monospace;
+.ch-initial {
+  width: 32px;
+  height: 20px;
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--dim);
 }
 
-/* Hero featured channel */
-#hero {
-  position: relative; border-radius: 16px; overflow: hidden;
-  height: 240px; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--bg2), var(--bg3));
-  border: 1px solid var(--border);
-  display: flex; align-items: flex-end;
-  cursor: pointer; transition: var(--transition);
-}
-#hero:hover { transform: translateY(-2px); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-#hero-bg {
-  position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(0,119,255,0.15), rgba(167,139,250,0.1));
-}
-#hero-overlay {
-  position: absolute; inset: 0;
-  background: linear-gradient(to right, rgba(7,9,15,0.95) 40%, transparent);
-}
-#hero-content {
-  position: relative; padding: 28px 32px; z-index: 1;
-}
-#hero-badge {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(0,229,255,0.15); border: 1px solid rgba(0,229,255,0.3);
-  border-radius: 20px; padding: 4px 12px; margin-bottom: 12px;
-  font-size: 11px; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase;
-}
-.live-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--accent2);
-  box-shadow: 0 0 6px var(--accent2);
-  animation: pulse 1.5s ease infinite;
-}
-#hero-name {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 28px; font-weight: 700;
-  color: var(--text); margin-bottom: 8px;
-  letter-spacing: 0.02em;
-}
-#hero-meta {
-  font-size: 14px; color: var(--text-dim); display: flex; gap: 16px;
-}
-#hero-play-btn {
-  margin-top: 16px;
-  background: var(--accent); color: var(--bg);
-  border: none; border-radius: 8px; padding: 10px 24px;
-  font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700;
-  letter-spacing: 0.1em; cursor: pointer;
-  display: flex; align-items: center; gap: 8px;
-  transition: var(--transition);
-}
-#hero-play-btn:hover { background: #33eeff; transform: scale(1.04); }
-
-/* Channel grid */
-.channels-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-}
-
-.channel-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+.ch-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--txt);
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ch-group {
+  font-size: 11px;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+.ch-fav {
+  color: var(--faint);
   cursor: pointer;
-  transition: var(--transition);
-  position: relative;
-  aspect-ratio: 16/10;
-  display: flex; flex-direction: column;
+  padding: 0 4px;
+  font-size: 14px;
+  flex-shrink: 0;
 }
-.channel-card:hover {
-  background: var(--bg-card-hover);
-  border-color: rgba(0,229,255,0.3);
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.4), var(--glow-sm);
-  z-index: 2;
+.ch-fav.on { color: var(--acc2); }
+
+/* Pagination */
+#pagination {
+  padding: 10px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  border-top: 1px solid var(--line);
 }
-.channel-card.focused {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(0,229,255,0.4), var(--glow);
-  transform: translateY(-4px) scale(1.03);
+.page-btn {
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 5px 14px;
+  color: var(--dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+}
+.page-btn:hover { color: var(--acc); border-color: var(--acc); }
+.page-btn.current { color: var(--acc); border-color: var(--acc); }
+
+#page-info {
+  font-size: 11px;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
 }
 
-.card-logo-wrap {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  padding: 16px; background: rgba(0,0,0,0.2);
+/* ── MESSAGE ÉTATS ───────────────────────────────────────────────────*/
+.msg {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--dim);
+  font-size: 13px;
 }
-.card-logo {
-  max-width: 80%; max-height: 52px;
-  object-fit: contain; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
-}
-.card-logo-fallback {
-  width: 52px; height: 52px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--bg3), var(--bg2));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px; font-weight: 700;
-  color: var(--text-dim); border: 1px solid var(--border);
-}
+.msg b { color: var(--acc); }
 
-.card-info {
-  padding: 10px 12px;
-  background: linear-gradient(transparent, rgba(0,0,0,0.6));
-  border-top: 1px solid var(--border);
-}
-.card-name {
-  font-size: 13px; font-weight: 600;
-  color: var(--text); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
-}
-.card-group {
-  font-size: 11px; color: var(--text-faint);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  letter-spacing: 0.05em;
-}
-.card-play-overlay {
-  position: absolute; inset: 0;
-  background: rgba(0,229,255,0.08);
-  display: flex; align-items: center; justify-content: center;
-  opacity: 0; transition: var(--transition);
-}
-.channel-card:hover .card-play-overlay { opacity: 1; }
-.play-icon-circle {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: rgba(0,229,255,0.9); color: var(--bg);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 18px;
-  box-shadow: 0 0 20px rgba(0,229,255,0.5);
-}
-
-.card-fav {
-  position: absolute; top: 8px; right: 8px;
-  background: rgba(7,9,15,0.8); border-radius: 50%;
-  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-  font-size: 14px; cursor: pointer; transition: var(--transition);
-  opacity: 0; border: 1px solid var(--border);
-}
-.channel-card:hover .card-fav { opacity: 1; }
-.card-fav.active { color: var(--accent2); opacity: 1; }
-.card-fav:hover { transform: scale(1.2); }
-
-/* Load more */
-#load-more {
-  display: flex; justify-content: center; padding: 16px 0 0;
-}
-.load-more-btn {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 10px 28px;
-  color: var(--text-dim); cursor: pointer;
-  font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 600;
-  letter-spacing: 0.1em; transition: var(--transition);
-}
-.load-more-btn:hover {
-  border-color: var(--border-accent); color: var(--accent);
-  box-shadow: var(--glow-sm);
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   VIDEO PLAYER OVERLAY
-═══════════════════════════════════════════════════════════════ */
-#player-overlay {
-  position: fixed; inset: 0; z-index: 500;
+/* ── PLAYER ──────────────────────────────────────────────────────────
+   Plein écran, fond noir, contrôles simples */
+#player {
+  display: none;
+  position: fixed;
+  inset: 0;
   background: #000;
-  display: none; flex-direction: column;
+  z-index: 100;
+  flex-direction: column;
 }
-#player-overlay.active { display: flex; }
+#player.on { display: flex; }
 
 #video-el {
-  flex: 1; width: 100%; background: #000;
+  flex: 1;
+  width: 100%;
   display: block;
+  background: #000;
 }
 
-/* Player controls */
-#player-controls {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column; justify-content: flex-end;
-  background: linear-gradient(transparent 40%, rgba(0,0,0,0.9) 100%);
-  opacity: 0; transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-#player-overlay.controls-visible #player-controls {
-  opacity: 1; pointer-events: all;
-}
-
-.player-top {
-  position: absolute; top: 0; left: 0; right: 0;
-  padding: 20px 28px;
-  background: linear-gradient(rgba(0,0,0,0.8), transparent);
-  display: flex; align-items: center; gap: 16px;
-}
-.player-back-btn {
-  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 50%; width: 40px; height: 40px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: white; font-size: 20px;
-  transition: var(--transition);
-}
-.player-back-btn:hover { background: rgba(255,255,255,0.2); }
-
-.player-channel-info { flex: 1; }
-.player-channel-name {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 20px; font-weight: 700; color: white;
-}
-.player-channel-meta {
-  font-size: 13px; color: rgba(255,255,255,0.6);
-  display: flex; gap: 12px; margin-top: 4px;
-}
-
-.player-live-badge {
-  display: flex; align-items: center; gap: 6px;
-  background: rgba(255,60,60,0.9); border-radius: 4px;
-  padding: 3px 10px; font-size: 12px; font-weight: 700;
-  color: white; letter-spacing: 0.1em;
-}
-
-.player-bottom {
-  padding: 20px 28px;
-  display: flex; flex-direction: column; gap: 12px;
-}
-
-.player-progress {
-  width: 100%; height: 3px; background: rgba(255,255,255,0.2);
-  border-radius: 3px; position: relative; cursor: pointer;
-}
-.player-progress-fill {
-  height: 100%; background: var(--accent);
-  border-radius: 3px; width: 0%;
-  box-shadow: var(--glow-sm);
-  animation: liveProgress 30s linear infinite;
-}
-@keyframes liveProgress {
-  from { width: 0%; } to { width: 100%; }
-}
-
-.player-actions {
-  display: flex; align-items: center; gap: 16px;
-}
-.player-btn {
-  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-  border-radius: var(--radius-sm); padding: 8px 16px;
-  color: white; cursor: pointer; font-size: 18px;
-  transition: var(--transition); display: flex; align-items: center; gap: 8px;
-  font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 600;
-  letter-spacing: 0.05em;
-}
-.player-btn:hover { background: rgba(255,255,255,0.2); }
-.player-btn.primary {
-  background: var(--accent); border-color: var(--accent); color: var(--bg);
-  font-size: 22px; padding: 8px 20px;
-}
-.player-btn.primary:hover { background: #33eeff; }
-
-.player-volume-wrap {
-  display: flex; align-items: center; gap: 8px; margin-left: auto;
-}
-.player-volume-wrap span { color: white; font-size: 18px; }
-#player-volume {
-  -webkit-appearance: none; width: 100px; height: 3px;
-  background: rgba(255,255,255,0.2); border-radius: 3px; outline: none;
-  cursor: pointer;
-}
-#player-volume::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 14px; height: 14px;
-  border-radius: 50%; background: var(--accent);
-  box-shadow: var(--glow-sm); cursor: pointer;
-}
-
-.player-channel-switcher {
-  margin-left: auto; display: flex; gap: 8px;
-}
-
-/* Player spinner */
-.player-spinner {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: 48px; height: 48px;
-  border: 3px solid rgba(255,255,255,0.1);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  display: none;
-}
-#player-overlay.buffering .player-spinner { display: block; }
-@keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
-
-/* Error overlay */
-#player-error {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  text-align: center; display: none;
-}
-#player-overlay.error #player-error { display: block; }
-.player-error-icon { font-size: 48px; margin-bottom: 12px; }
-.player-error-msg { color: white; font-size: 16px; margin-bottom: 16px; }
-
-/* ═══════════════════════════════════════════════════════════════
-   SETTINGS PANEL
-═══════════════════════════════════════════════════════════════ */
-#settings-overlay {
-  position: fixed; inset: 0; z-index: 600;
-  background: rgba(0,0,0,0.7);
-  display: none; align-items: center; justify-content: flex-end;
-  backdrop-filter: blur(8px);
-}
-#settings-overlay.active { display: flex; }
-
-#settings-panel {
-  width: 480px; height: 100vh;
+#player-bar {
   background: var(--bg2);
-  border-left: 1px solid var(--border);
-  display: flex; flex-direction: column;
-  animation: slideInRight 0.3s ease;
+  border-top: 1px solid var(--line);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+#player-info {
+  flex: 1;
   overflow: hidden;
 }
-@keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+#player-name {
+  font-size: 14px;
+  color: var(--txt);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#player-meta {
+  font-size: 11px;
+  color: var(--dim);
 }
 
-.settings-header {
-  padding: 20px 24px; border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; gap: 16px;
-  background: var(--bg);
+.pbtn {
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 5px 10px;
+  color: var(--txt);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  flex-shrink: 0;
 }
-.settings-header h2 {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 18px; font-weight: 700;
-  color: var(--accent); flex: 1; letter-spacing: 0.05em;
-}
+.pbtn:hover { color: var(--acc); border-color: var(--acc); }
+.pbtn.accent { color: var(--acc); border-color: var(--acc); }
 
-.settings-tabs {
-  display: flex; padding: 8px 16px; gap: 4px;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
+#vol-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
-.settings-tab {
-  flex-shrink: 0; padding: 8px 14px; border-radius: 8px;
-  cursor: pointer; font-size: 13px; font-weight: 600;
-  color: var(--text-dim); transition: var(--transition);
-  letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;
-}
-.settings-tab:hover { background: var(--bg-card-hover); color: var(--text); }
-.settings-tab.active {
-  background: rgba(0,229,255,0.12);
-  color: var(--accent);
-  border: 1px solid rgba(0,229,255,0.2);
-}
-
-.settings-body {
-  flex: 1; overflow-y: auto; padding: 16px 20px;
-  display: flex; flex-direction: column; gap: 4px;
-}
-.settings-body::-webkit-scrollbar { width: 4px; }
-.settings-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-.settings-group {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden; margin-bottom: 12px;
-}
-.settings-group-title {
-  padding: 10px 16px 6px;
-  font-size: 11px; color: var(--text-faint);
-  letter-spacing: 0.2em; text-transform: uppercase;
-  border-bottom: 1px solid var(--border);
-}
-
-.setting-row {
-  display: flex; align-items: center; padding: 14px 16px;
-  border-bottom: 1px solid var(--border); gap: 12px;
-  transition: var(--transition);
-}
-.setting-row:last-child { border-bottom: none; }
-.setting-row:hover { background: var(--bg-card-hover); }
-
-.setting-label { flex: 1; }
-.setting-name {
-  font-size: 14px; font-weight: 600; color: var(--text);
-}
-.setting-desc {
-  font-size: 12px; color: var(--text-dim); margin-top: 2px;
-}
-.setting-control { flex-shrink: 0; }
-
-/* Toggle */
-.toggle {
-  width: 44px; height: 24px; border-radius: 12px;
-  background: var(--bg3); border: 1px solid var(--border);
-  position: relative; cursor: pointer; transition: var(--transition);
-}
-.toggle.on { background: rgba(0,229,255,0.3); border-color: var(--accent); }
-.toggle::after {
-  content: ''; position: absolute;
-  top: 3px; left: 3px;
-  width: 16px; height: 16px; border-radius: 50%;
-  background: var(--text-dim); transition: var(--transition);
-}
-.toggle.on::after {
-  background: var(--accent);
-  transform: translateX(20px);
-  box-shadow: var(--glow-sm);
-}
-
-/* Slider */
-.setting-slider {
-  -webkit-appearance: none; width: 120px; height: 3px;
-  background: var(--bg3); border-radius: 3px; outline: none;
+#vol-wrap span { font-size: 11px; color: var(--dim); min-width: 24px; text-align: right; }
+#vol {
+  width: 80px;
+  accent-color: var(--acc);
   cursor: pointer;
 }
-.setting-slider::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 16px; height: 16px;
-  border-radius: 50%; background: var(--accent);
-  box-shadow: var(--glow-sm); cursor: pointer;
+
+/* Spinner ultra-simple (1 seul élément, CSS pur) */
+#spinner {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border: 3px solid var(--line);
+  border-top-color: var(--acc);
+  border-radius: 50%;
+  /* animation légère : 1 seul élément, pas de will-change */
+  animation: spin .8s linear infinite;
 }
-.slider-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px; color: var(--accent); min-width: 36px;
-  text-align: right;
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#player.loading #spinner { display: block; }
+
+#player-err {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--dim);
+  font-size: 13px;
+}
+#player.error #player-err { display: block; }
+
+/* ── SETTINGS OVERLAY ────────────────────────────────────────────────*/
+#settings {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.8);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+#settings.on { display: flex; }
+
+#settings-box {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  width: 460px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.sth {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sth-title { flex: 1; color: var(--acc); font-size: 14px; letter-spacing: 1px; }
+.stb { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.stb::-webkit-scrollbar { width: 3px; }
+.stb::-webkit-scrollbar-thumb { background: var(--line); }
+
+.st-row { display: flex; align-items: center; gap: 10px; }
+.st-label { flex: 1; font-size: 12px; color: var(--dim); }
+.st-label b { display: block; color: var(--txt); font-size: 13px; margin-bottom: 2px; }
+
+.st-input {
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 4px 8px;
+  color: var(--txt);
+  font-family: inherit;
+  font-size: 12px;
+  flex: 1;
+  outline: none;
+}
+.st-input:focus { border-color: var(--acc); }
+
+.preset-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: 4px;
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 5px 10px;
+  color: var(--dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+.preset-btn:hover { border-color: var(--acc); color: var(--txt); }
+
+.stf {
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 8px;
+}
+.stf button {
+  flex: 1;
+  padding: 7px;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-save { background: var(--acc); border: 1px solid var(--acc); color: #000; font-weight: bold; }
+.btn-cancel { background: var(--bg3); border: 1px solid var(--line); color: var(--dim); }
+
+/* ── NOTIFICATION ────────────────────────────────────────────────────
+   Sans animation slide pour économiser le repaint */
+#notif {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--acc);
+  border-radius: 3px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--txt);
+  z-index: 999;
+  display: none;
+  max-width: 300px;
+}
+#notif.on { display: block; }
+#notif-sub { color: var(--dim); font-size: 11px; margin-top: 2px; }
+
+/* ── BOOT ─────────────────────────────────────────────────────────────
+   Ultra-minimaliste : 1 div, 1 animation, pas de particules */
+#boot {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.boot-logo {
+  font-size: 48px;
+  color: var(--acc);
+  letter-spacing: 6px;
+  margin-bottom: 24px;
+}
+.boot-bar-wrap {
+  width: 220px;
+  height: 2px;
+  background: var(--bg3);
+  border-radius: 1px;
+}
+.boot-bar {
+  height: 100%;
+  background: var(--acc);
+  border-radius: 1px;
+  width: 0;
+  /* transition CSS simple : 1 propriété */
+  transition: width .3s linear;
+}
+.boot-status {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 8px;
+  height: 16px;
+  letter-spacing: 1px;
 }
 
-/* Select */
-.setting-select {
-  background: var(--bg3); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 6px 10px;
-  color: var(--text); font-family: 'Rajdhani', sans-serif;
-  font-size: 14px; outline: none; cursor: pointer;
+/* ── TOUCHES DE RACCOURCI (affichage dans player bar) ── */
+.kbd {
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: var(--faint);
 }
 
-/* Key binding */
-.key-bind {
-  background: var(--bg3); border: 1px solid var(--border);
-  border-radius: 6px; padding: 4px 10px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px; color: var(--accent);
-  cursor: pointer; transition: var(--transition);
-  min-width: 60px; text-align: center;
-}
-.key-bind:hover { border-color: var(--accent); box-shadow: var(--glow-sm); }
-.key-bind.listening { border-color: var(--accent2); color: var(--accent2); animation: blink 1s ease infinite; }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-.settings-footer {
-  padding: 16px 20px; border-top: 1px solid var(--border);
-  display: flex; gap: 12px;
-}
-.settings-footer button {
-  flex: 1; padding: 10px; border-radius: var(--radius-sm);
-  cursor: pointer; font-family: 'Rajdhani', sans-serif;
-  font-size: 14px; font-weight: 700; letter-spacing: 0.1em;
-  transition: var(--transition);
-}
-.btn-save {
-  background: var(--accent); border: 1px solid var(--accent);
-  color: var(--bg);
-}
-.btn-save:hover { background: #33eeff; }
-.btn-cancel {
-  background: var(--bg-card); border: 1px solid var(--border);
-  color: var(--text-dim);
-}
-.btn-cancel:hover { border-color: var(--border-accent); color: var(--text); }
-
-/* ═══════════════════════════════════════════════════════════════
-   NOTIFICATION
-═══════════════════════════════════════════════════════════════ */
-#notification {
-  position: fixed; bottom: 24px; right: 24px; z-index: 700;
-  min-width: 280px; max-width: 360px;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 14px 18px;
-  display: flex; align-items: center; gap: 12px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-  transform: translateY(80px); opacity: 0;
-  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
-  pointer-events: none;
-}
-#notification.show { transform: translateY(0); opacity: 1; }
-.notif-icon { font-size: 22px; flex-shrink: 0; }
-.notif-text { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; }
-.notif-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
-
-/* ═══════════════════════════════════════════════════════════════
-   LOADING STATE
-═══════════════════════════════════════════════════════════════ */
-.skeleton {
-  background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease infinite;
-  border-radius: var(--radius);
-}
-@keyframes shimmer {
-  from { background-position: 200% 0; }
-  to { background-position: -200% 0; }
-}
-
-#loading-state {
-  display: none; flex-direction: column; gap: 28px;
-}
-#loading-state.active { display: flex; }
-
-.skeleton-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-}
-.skeleton-card {
-  height: 120px; border-radius: var(--radius);
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   EMPTY STATE
-═══════════════════════════════════════════════════════════════ */
-.empty-state {
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 60px 20px; text-align: center; gap: 12px;
-}
-.empty-icon { font-size: 52px; opacity: 0.3; }
-.empty-title { font-size: 20px; font-weight: 700; color: var(--text-dim); }
-.empty-desc { font-size: 14px; color: var(--text-faint); max-width: 280px; line-height: 1.6; }
-
-/* ═══════════════════════════════════════════════════════════════
-   GAMEPAD INDICATOR
-═══════════════════════════════════════════════════════════════ */
-#gamepad-indicator {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  background: rgba(0,229,255,0.1); border: 1px solid rgba(0,229,255,0.3);
-  border-radius: 24px; padding: 8px 20px;
-  font-size: 12px; color: var(--accent); letter-spacing: 0.1em;
-  display: none; align-items: center; gap: 8px;
-  z-index: 400;
-}
-#gamepad-indicator.visible { display: flex; }
-
-/* ═══════════════════════════════════════════════════════════════
-   FOCUS RING (TV navigation)
-═══════════════════════════════════════════════════════════════ */
-.focusable:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* scrollbar glow on hover */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+/* ── FIX IMAGE ICONS ── */
+.fav-star { display: inline; }
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════════
-     BOOT SCREEN
-═══════════════════════════════════════════════════════════════ -->
-<div id="boot-screen">
-  <div class="boot-dots" id="boot-dots"></div>
-  <div class="boot-logo">PiTV OS</div>
-  <div class="boot-tagline" id="boot-tagline">Raspberry Pi · Windows · Linux · Standalone</div>
-  <div class="boot-progress-wrap">
-    <div class="boot-progress-label">Initialisation du système</div>
-    <div class="boot-progress-bar">
-      <div class="boot-progress-fill" id="boot-fill"></div>
-    </div>
-    <div class="boot-status" id="boot-status">Démarrage...</div>
-  </div>
+<!-- BOOT -->
+<div id="boot">
+  <div class="boot-logo">PiTV</div>
+  <div class="boot-bar-wrap"><div class="boot-bar" id="bbar"></div></div>
+  <div class="boot-status" id="bstatus">Démarrage...</div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     MAIN APP
-═══════════════════════════════════════════════════════════════ -->
-<div id="app">
-
-  <!-- HEADER -->
+<!-- APP -->
+<div id="app" style="display:none">
   <header>
-    <div class="header-logo">⬡ PiTV</div>
-
-    <div class="header-search">
-      <span class="search-icon">🔍</span>
-      <input type="text" id="search-input" placeholder="Rechercher une chaîne..." autocomplete="off">
-    </div>
-
-    <div class="header-spacer"></div>
-
-    <div class="header-info">
-      <div>
-        <div class="header-clock" id="header-clock">00:00</div>
-        <div class="header-date" id="header-date">Dimanche</div>
-      </div>
-
-      <div class="header-status">
-        <div class="status-pill">
-          <div class="status-dot"></div>
-          <span id="channel-count">—</span>
-        </div>
-      </div>
-
-      <button class="icon-btn focusable" id="refresh-btn" title="Actualiser">↻</button>
-      <button class="icon-btn focusable" id="settings-btn" title="Paramètres">⚙</button>
-    </div>
+    <div class="logo">PiTV</div>
+    <input type="text" id="search" placeholder="Rechercher..." autocomplete="off" spellcheck="false">
+    <div id="ch-count" style="display:none"></div>
+    <div id="clock">--:--</div>
+    <button class="hbtn" id="settings-btn">Param.</button>
+    <button class="hbtn" id="refresh-btn">Recharger</button>
   </header>
 
-  <!-- MAIN -->
-  <div class="main-layout">
+  <nav id="sidebar">
+    <div class="sidebar-label">Menu</div>
+    <div class="nav-item active" data-view="all">📡 Toutes</div>
+    <div class="nav-item" data-view="favorites">★ Favoris</div>
+    <div class="nav-item" data-view="recent">◷ Récents</div>
+    <div class="sidebar-label" style="margin-top:4px">Catégories</div>
+    <div id="cats"></div>
+  </nav>
 
-    <!-- SIDEBAR -->
-    <nav id="sidebar">
-      <div class="sidebar-section">
-        <div class="sidebar-label">Navigation</div>
-        <div class="nav-item active focusable" data-view="home">
-          <span class="nav-icon">🏠</span> Accueil
-        </div>
-        <div class="nav-item focusable" data-view="favorites">
-          <span class="nav-icon">⭐</span> Favoris
-          <span class="nav-badge" id="fav-count">0</span>
-        </div>
-        <div class="nav-item focusable" data-view="recent">
-          <span class="nav-icon">🕐</span> Récents
-        </div>
-        <div class="nav-item focusable" data-view="all">
-          <span class="nav-icon">📡</span> Toutes les chaînes
-        </div>
+  <main id="content">
+    <div id="channels-wrap">
+      <div class="msg" id="msg-loading">Chargement des chaînes...</div>
+      <div class="section-bar" id="section-bar" style="display:none">
+        <span class="section-bar-title" id="sec-title">Toutes les chaînes</span>
+        <span class="section-bar-count" id="sec-count"></span>
       </div>
-
-      <div class="sidebar-divider"></div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-label">Catégories</div>
-      </div>
-      <div id="categories-list"></div>
-    </nav>
-
-    <!-- CONTENT -->
-    <main id="content">
-
-      <!-- Loading skeletons -->
-      <div id="loading-state" class="active">
-        <div class="skeleton" style="height:240px;border-radius:16px;"></div>
-        <div>
-          <div class="skeleton" style="height:24px;width:200px;margin-bottom:16px;"></div>
-          <div class="skeleton-grid" id="skeleton-grid"></div>
-        </div>
-      </div>
-
-      <!-- Hero -->
-      <div id="hero" style="display:none;">
-        <div id="hero-bg"></div>
-        <div id="hero-overlay"></div>
-        <div id="hero-content">
-          <div id="hero-badge"><div class="live-dot"></div> EN DIRECT</div>
-          <div id="hero-name">Chaîne vedette</div>
-          <div id="hero-meta">
-            <span id="hero-group">—</span>
-            <span id="hero-country">—</span>
-          </div>
-          <button id="hero-play-btn">▶ Regarder maintenant</button>
-        </div>
-      </div>
-
-      <!-- Channels section -->
-      <div id="channels-section" style="display:none;">
-        <div class="section-header">
-          <div class="section-title" id="section-title">Chaînes populaires</div>
-          <div class="section-count" id="section-count"></div>
-        </div>
-        <div class="channels-grid" id="channels-grid"></div>
-        <div id="load-more">
-          <button class="load-more-btn focusable" id="load-more-btn">Charger plus</button>
-        </div>
-      </div>
-
-    </main>
-  </div>
+      <div id="ch-list"></div>
+      <div id="pagination" style="display:none"></div>
+    </div>
+  </main>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     VIDEO PLAYER
-═══════════════════════════════════════════════════════════════ -->
-<div id="player-overlay">
+<!-- PLAYER -->
+<div id="player">
+  <div id="spinner"></div>
+  <div id="player-err">
+    <div style="font-size:28px;margin-bottom:8px">📡</div>
+    <div id="err-msg">Flux indisponible</div>
+    <div style="margin-top:10px;display:flex;gap:8px;justify-content:center">
+      <button class="pbtn" onclick="retryStream()">Réessayer</button>
+      <button class="pbtn" onclick="nextCh()">Suivant</button>
+      <button class="pbtn" onclick="closePlayer()">Fermer</button>
+    </div>
+  </div>
   <video id="video-el" autoplay playsinline></video>
-
-  <div class="player-spinner"></div>
-  <div id="player-error">
-    <div class="player-error-icon" id="player-error-icon">📡</div>
-    <div class="player-error-msg" id="player-error-msg">Impossible de charger le flux</div>
-    <div id="player-error-sub" style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:16px;max-width:420px;text-align:center;line-height:1.5"></div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-      <button class="player-btn" onclick="retryStream()">↺ Réessayer</button>
-      <button class="player-btn" id="open-in-tab-btn" style="display:none" onclick="openStreamInTab()">↗ Ouvrir dans un onglet</button>
-      <button class="player-btn" onclick="nextChannel()">⏭ Chaîne suivante</button>
+  <div id="player-bar">
+    <button class="pbtn" onclick="closePlayer()">← Retour</button>
+    <div id="player-info">
+      <div id="player-name">—</div>
+      <div id="player-meta"></div>
     </div>
-  </div>
-
-  <div id="player-controls">
-    <div class="player-top">
-      <button class="player-back-btn focusable" onclick="closePlayer()">←</button>
-      <div class="player-channel-info">
-        <div class="player-channel-name" id="player-name">Chaîne</div>
-        <div class="player-channel-meta">
-          <span id="player-group">—</span>
-          <span id="player-country">—</span>
-        </div>
-      </div>
-      <div class="player-live-badge"><div class="live-dot"></div> LIVE</div>
+    <button class="pbtn" id="pp-btn" onclick="togglePP()">⏸</button>
+    <button class="pbtn" onclick="prevCh()">⏮</button>
+    <button class="pbtn" onclick="nextCh()">⏭</button>
+    <button class="pbtn" id="fav-btn" onclick="toggleFavCurrent()">☆</button>
+    <div id="vol-wrap">
+      <span id="vol-display">80</span>
+      <input type="range" id="vol" min="0" max="100" value="80">
     </div>
-
-    <div class="player-bottom">
-      <div class="player-progress"><div class="player-progress-fill" id="player-progress-fill"></div></div>
-
-      <div class="player-actions">
-        <button class="player-btn primary focusable" id="play-pause-btn" onclick="togglePlayPause()">⏸</button>
-        <button class="player-btn focusable" onclick="prevChannel()">⏮</button>
-        <button class="player-btn focusable" onclick="nextChannel()">⏭</button>
-        <button class="player-btn focusable" id="fav-player-btn" onclick="toggleFavorite()">☆ Favori</button>
-
-        <div class="player-volume-wrap">
-          <span>🔊</span>
-          <input type="range" id="player-volume" min="0" max="100" value="80">
-          <span class="slider-value" id="volume-display">80</span>
-        </div>
-
-        <button class="player-btn focusable" onclick="toggleFullscreen()">⛶</button>
-      </div>
-    </div>
+    <button class="pbtn" onclick="toggleFS()">⛶</button>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     SETTINGS PANEL
-═══════════════════════════════════════════════════════════════ -->
-<div id="settings-overlay">
-  <div id="settings-panel">
-    <div class="settings-header">
-      <h2>⚙ Paramètres</h2>
-      <button class="icon-btn" onclick="closeSettings()">✕</button>
+<!-- SETTINGS -->
+<div id="settings">
+  <div id="settings-box">
+    <div class="sth">
+      <div class="sth-title">PARAMÈTRES</div>
+      <button class="pbtn" onclick="closeSettings()">✕</button>
     </div>
-
-    <div class="settings-tabs" id="settings-tabs">
-      <div class="settings-tab active" data-tab="display">🖥 Affichage</div>
-      <div class="settings-tab" data-tab="audio">🔊 Audio</div>
-      <div class="settings-tab" data-tab="video">📽 Vidéo</div>
-      <div class="settings-tab" data-tab="keyboard">⌨ Clavier</div>
-      <div class="settings-tab" data-tab="gamepad">🎮 Manette</div>
-      <div class="settings-tab" data-tab="interface">🎨 Interface</div>
-      <div class="settings-tab" data-tab="network">🌐 Réseau</div>
-      <div class="settings-tab" data-tab="system">💻 Système</div>
+    <div class="stb">
+      <div class="st-row">
+        <div class="st-label"><b>Source M3U</b>URL de la liste IPTV</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px">
+        <button class="preset-btn" onclick="setPreset('https://iptv-org.github.io/iptv/languages/fra.m3u')">🇫🇷 France uniquement</button>
+        <button class="preset-btn" onclick="setPreset('https://iptv-org.github.io/iptv/languages/eng.m3u')">🇬🇧 English channels</button>
+        <button class="preset-btn" onclick="setPreset('https://iptv-org.github.io/iptv/index.m3u')">🌍 Monde entier (lent)</button>
+      </div>
+      <input type="text" id="m3u-input" class="st-input" placeholder="https://...">
+      <div class="st-row" style="margin-top:8px">
+        <div class="st-label"><b>Logos</b>Afficher les logos des chaînes</div>
+        <input type="checkbox" id="show-logos" checked style="accent-color:var(--acc);width:16px;height:16px">
+      </div>
+      <div class="st-row">
+        <div class="st-label"><b>Lignes par page</b>Pagination (moins = plus rapide)</div>
+        <select id="page-size" class="st-input" style="flex:0;width:70px">
+          <option value="30">30</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+      <div class="st-row">
+        <div class="st-label"><b>Volume initial</b></div>
+        <input type="range" id="init-vol" min="0" max="100" value="80" style="accent-color:var(--acc);width:100px">
+        <span id="init-vol-display" style="font-size:11px;color:var(--acc);min-width:28px;text-align:right">80</span>
+      </div>
     </div>
-
-    <div class="settings-body" id="settings-body"></div>
-
-    <div class="settings-footer">
-      <button class="btn-save" onclick="saveSettings()">💾 Sauvegarder</button>
+    <div class="stf">
+      <button class="btn-save" onclick="saveSettings()">Sauvegarder</button>
       <button class="btn-cancel" onclick="closeSettings()">Annuler</button>
     </div>
   </div>
 </div>
 
-<!-- Notification -->
-<div id="notification">
-  <span class="notif-icon" id="notif-icon">ℹ</span>
-  <div>
-    <div class="notif-text" id="notif-text"></div>
-    <div class="notif-sub" id="notif-sub"></div>
-  </div>
+<!-- NOTIFICATION -->
+<div id="notif">
+  <div id="notif-text"></div>
+  <div id="notif-sub"></div>
 </div>
 
-<!-- Gamepad indicator -->
-<div id="gamepad-indicator">
-  🎮 <span>Manette connectée</span>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════
-     JAVASCRIPT
-═══════════════════════════════════════════════════════════════ -->
+<!-- HLS.js chargé en dernier, de manière asynchrone -->
 <script>
 'use strict';
 
-// ─── STATE ────────────────────────────────────────────────────────────────────
-const state = {
+// ─── CONFIG ──────────────────────────────────────────────────────────
+const DEFAULT_M3U = 'https://iptv-org.github.io/iptv/languages/fra.m3u';
+const PROXIES = [
+  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+];
+const IS_SERVER = location.protocol !== 'file:' && location.hostname;
+
+// ─── ÉTAT ─────────────────────────────────────────────────────────────
+const S = {
   channels: [],
-  filteredChannels: [],
-  categories: [],
-  countries: [],
-  favorites: [],
-  recentChannels: [],
-  currentView: 'home',
-  currentCategory: null,
-  currentChannel: null,
-  currentChannelIndex: 0,
-  settings: null,
+  filtered: [],
+  cats: {},
+  favs: [],
+  recent: [],
+  view: 'all',
+  cat: null,
+  query: '',
+  current: null,
+  currentIdx: 0,
   hls: null,
-  searchQuery: '',
-  offset: 0,
-  limit: 60,
-  isLoaded: false,
-  controlsTimeout: null,
-  listeningForKey: null,
-  gamepadConnected: false,
-  gamepadInterval: null,
-  volume: 80,
-  isMuted: false,
+  vol: 80,
+  muted: false,
+  page: 0,
+  pageSize: 50,
+  showLogos: true,
+  m3uUrl: DEFAULT_M3U,
 };
 
-// ─── BOOT SEQUENCE ────────────────────────────────────────────────────────────
-const bootSteps = [
-  { label: 'Initialisation du noyau...', p: 10 },
-  { label: 'Chargement des pilotes vidéo...', p: 25 },
-  { label: 'Configuration réseau...', p: 40 },
-  { label: 'Connexion aux sources IPTV...', p: 60 },
-  { label: 'Chargement des chaînes...', p: 80 },
-  { label: 'Préparation de l\'interface...', p: 95 },
-  { label: 'Prêt !', p: 100 },
-];
-
-function generateBootDots() {
-  const wrap = document.getElementById('boot-dots');
-  for (let i = 0; i < 30; i++) {
-    const d = document.createElement('div');
-    d.className = 'boot-dot';
-    d.style.left = Math.random() * 100 + 'vw';
-    d.style.top = Math.random() * 100 + 'vh';
-    d.style.animationDuration = (3 + Math.random() * 5) + 's';
-    d.style.animationDelay = (Math.random() * 4) + 's';
-    d.style.opacity = (0.1 + Math.random() * 0.5);
-    d.style.width = d.style.height = (1 + Math.random() * 2) + 'px';
-    wrap.appendChild(d);
-  }
-}
-
-async function runBoot() {
-  generateBootDots();
-  const fill = document.getElementById('boot-fill');
-  const status = document.getElementById('boot-status');
-  const tagline = document.getElementById('boot-tagline');
-
-  if (tagline) {
-    tagline.textContent = IS_SERVER_MODE
-      ? `Mode Serveur — ${location.host}`
-      : 'Mode Standalone · Fonctionne sans serveur';
-  }
-
-  // Toutes les étapes défilent rapidement
-  for (const step of bootSteps) {
-    fill.style.width = step.p + '%';
-    status.textContent = step.label;
-    await sleep(200 + Math.random() * 150);
-  }
-
-  // Chargement des paramètres seulement (rapide, local)
-  await loadSettings();
-
-  fill.style.width = '100%';
-  status.textContent = 'Prêt !';
-  await sleep(350);
-
-  // ✅ On affiche l'interface AVANT de charger les chaînes
-  document.getElementById('boot-screen').classList.add('fade-out');
-  await sleep(800);
-  document.getElementById('boot-screen').style.display = 'none';
-  document.getElementById('app').classList.add('visible');
-  state.isLoaded = true;
-
-  // ✅ Les chaînes chargent en arrière-plan (pas de await ici)
-  loadChannels();
-}
-
-// ─── MODE DÉTECTION ───────────────────────────────────────────────────────────
-// Détecte si on tourne via un serveur HTTP (Raspberry Pi / Linux / Windows Node)
-// ou en local (fichier ouvert directement dans le navigateur)
-const IS_SERVER_MODE = (
-  location.protocol === 'http:' || location.protocol === 'https:'
-) && location.hostname !== '';
-
-// URL de base du serveur (vide si standalone)
-const SERVER_BASE = IS_SERVER_MODE
-  ? `${location.protocol}//${location.host}`
-  : '';
-
-// Source M3U par défaut — liste allégée France (plus rapide qu'index.m3u complet)
-// L'utilisateur peut changer ça dans Paramètres > Système
-const DEFAULT_M3U_URL = 'https://iptv-org.github.io/iptv/languages/fra.m3u';
-
-// Proxies CORS de secours (essayés dans l'ordre en cas d'échec)
-const CORS_PROXIES = [
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://cors.sh/${url}`,
-];
-
-// ─── API ──────────────────────────────────────────────────────────────────────
-async function api(path, opts = {}) {
-  if (!IS_SERVER_MODE) return null; // mode standalone : pas de serveur
-  try {
-    const r = await fetch(SERVER_BASE + path, opts);
-    if (!r.ok) return null;
-    return await r.json();
-  } catch (e) {
-    console.warn('API indisponible :', path);
-    return null;
-  }
-}
-
-// ─── STOCKAGE LOCAL (localStorage) ───────────────────────────────────────────
+// ─── LOCALSTORAGE ─────────────────────────────────────────────────────
 const LS = {
-  get(key, def = null) {
-    try { const v = localStorage.getItem('pitv_' + key); return v !== null ? JSON.parse(v) : def; }
-    catch { return def; }
-  },
-  set(key, val) {
-    try { localStorage.setItem('pitv_' + key, JSON.stringify(val)); } catch {}
-  },
+  g: (k, d=null) => { try { const v=localStorage.getItem('pitv_'+k); return v!==null?JSON.parse(v):d; } catch{return d;} },
+  s: (k, v)      => { try { localStorage.setItem('pitv_'+k, JSON.stringify(v)); } catch{} },
 };
 
-// Paramètres par défaut (utilisés en mode standalone ou si le serveur ne répond pas)
-const DEFAULT_SETTINGS = {
-  display: { resolution: 'auto', brightness: 80, contrast: 100, saturation: 100, hdmiMode: true, overscan: false },
-  audio: { volume: 80, output: 'hdmi', equalizer: 'flat', surround: false },
-  video: { deinterlace: false, hardwareAccel: true, aspectRatio: '16:9', quality: 'auto', bufferSize: 5 },
-  input: {
-    keyboard: {
-      up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight',
-      select: 'Enter', back: 'Escape',
-      volumeUp: 'ArrowUp', volumeDown: 'ArrowDown', mute: 'm',
-      fullscreen: 'f', channelUp: 'PageUp', channelDown: 'PageDown',
-      info: 'i', settings: 's', search: '/',
-    },
-    gamepad: { enabled: true, deadzone: 0.2, rumble: false },
-    remote: { enabled: false },
-  },
-  interface: { animations: true, clock24h: true, screensaver: '300' },
-  network: { useLocalDNS: false, timeout: 10, retries: 3 },
-  iptv: { m3uUrl: DEFAULT_M3U_URL },
-};
+// ─── HELPERS ──────────────────────────────────────────────────────────
+function esc(s) { return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
 
-// ─── CHARGEMENT DES CHAÎNES ──────────────────────────────────────────────────
-async function loadChannels() {
-  if (IS_SERVER_MODE) {
-    // ── Mode serveur (Raspberry Pi / Linux / Windows avec Node.js) ──
-    const data = await api('/api/channels?limit=2000');
-    if (data && data.channels) {
-      state.channels = data.channels;
-      const cats = await api('/api/categories');
-      if (cats) state.categories = cats.categories;
-      renderCategories();
-      await loadFavorites();
-      renderView();
-      return;
-    }
-  }
-
-  // ── Mode standalone : chargement direct du M3U depuis le navigateur ──
-  const m3uUrl = state.settings?.iptv?.m3uUrl || DEFAULT_M3U_URL;
-  await loadM3UDirect(m3uUrl);
+let _notifTO;
+function notify(text, sub='', dur=3000) {
+  const el=document.getElementById('notif');
+  document.getElementById('notif-text').textContent=text;
+  document.getElementById('notif-sub').textContent=sub;
+  el.classList.add('on');
+  clearTimeout(_notifTO);
+  _notifTO=setTimeout(()=>el.classList.remove('on'),dur);
 }
 
-async function loadM3UDirect(url) {
-  const statusEl = document.getElementById('boot-status');
-  const setStatus = t => { if (statusEl) statusEl.textContent = t; };
+// ─── BOOT ─────────────────────────────────────────────────────────────
+async function boot() {
+  const bar=document.getElementById('bbar');
+  const st=document.getElementById('bstatus');
 
-  setStatus('Connexion à la source IPTV...');
+  // Charge les préférences depuis localStorage (instantané)
+  S.m3uUrl = LS.g('m3u', DEFAULT_M3U);
+  S.favs   = LS.g('favs', []);
+  S.recent = LS.g('recent', []);
+  S.vol    = LS.g('vol', 80);
+  S.showLogos = LS.g('logos', true);
+  S.pageSize  = LS.g('psize', 50);
 
-  const needProxy = !IS_SERVER_MODE || location.protocol === 'file:';
-  // En mode serveur : /api/proxy d'abord (Node.js, sans CORS), puis proxies publics
-  // En standalone  : proxies publics uniquement
-  const urlsToTry = IS_SERVER_MODE
-    ? [`${SERVER_BASE}/api/proxy?url=${encodeURIComponent(url)}`, ...CORS_PROXIES.map(p => p(url))]
-    : CORS_PROXIES.map(p => p(url));
+  bar.style.width = '30%'; st.textContent = 'Chargement des préférences...';
+  await sleep(100);
+  bar.style.width = '60%'; st.textContent = 'Initialisation de l\'interface...';
+  await sleep(80);
+  bar.style.width = '90%'; st.textContent = 'Prêt !';
+  await sleep(80);
+  bar.style.width = '100%';
+  await sleep(180);
 
-  let lastError = null;
+  document.getElementById('boot').style.display = 'none';
+  document.getElementById('app').style.display   = '';
+  startClock();
 
-  for (let i = 0; i < urlsToTry.length; i++) {
-    const fetchUrl = urlsToTry[i];
-    const label = (i === 0 && !needProxy) ? 'directe' : `proxy ${i + (needProxy ? 1 : 0)}`;
-    setStatus('Chargement des chaînes...');
+  // Volume
+  document.getElementById('vol').value=S.vol;
+  document.getElementById('vol-display').textContent=S.vol;
 
+  // Lance le chargement M3U en arrière-plan
+  showMsg('Chargement des chaînes...');
+  loadM3U(S.m3uUrl);
+}
+
+// ─── M3U LOADER (streaming progressif) ────────────────────────────────
+let _retries = 0;
+
+async function loadM3U(url) {
+  const IS_SERVER_MODE = IS_SERVER;
+  const endpoints = IS_SERVER_MODE
+    ? [`/api/proxy?url=${encodeURIComponent(url)}`, ...PROXIES.map(p=>p(url))]
+    : PROXIES.map(p=>p(url));
+
+  for (let i=0; i<endpoints.length; i++) {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
+      const ctrl = new AbortController();
+      const to   = setTimeout(()=>ctrl.abort(), 18000);
+      const resp = await fetch(endpoints[i], {signal: ctrl.signal});
+      clearTimeout(to);
+      if (!resp.ok) throw new Error('HTTP '+resp.status);
 
-      const resp = await fetch(fetchUrl, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-      setStatus('Réception des données...');
-
-      // ── Lecture progressive du flux de réponse ──────────────────────────
-      // Au lieu d'attendre tout le fichier, on parse au fur et à mesure
-      // et on affiche les chaînes dès qu'on en a assez
-      const reader = resp.body?.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
-      let current = null;
-      let id = 0;
-      const channels = [];
-      let firstBatchDone = false;
+      // Lecture en streaming pour afficher rapidement
+      const reader  = resp.body?.getReader();
+      const decoder = new TextDecoder();
+      let buf='', cur=null, id=0, all=[];
+      let firstRender=false;
 
       if (reader) {
         while (true) {
-          const { done, value } = await reader.read();
+          const {done,value}=await reader.read();
           if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-
-          // Parse toutes les lignes complètes
-          const newline = buffer.lastIndexOf('\n');
-          if (newline < 0) continue;
-          const chunk = buffer.slice(0, newline + 1);
-          buffer = buffer.slice(newline + 1);
-
+          buf += decoder.decode(value,{stream:true});
+          const nl = buf.lastIndexOf('\n');
+          if (nl<0) continue;
+          const chunk=buf.slice(0,nl+1);
+          buf=buf.slice(nl+1);
           for (const raw of chunk.split('\n')) {
-            const line = raw.trim();
+            const line=raw.trim();
             if (!line) continue;
-
             if (line.startsWith('#EXTINF:')) {
-              current = { id: 'ch_' + (++id), name: '', group: 'Autres', country: '', logo: '', url: '' };
-              const comma = line.lastIndexOf(',');
-              current.name = comma >= 0 ? line.slice(comma + 1).trim() : 'Chaîne ' + id;
-              const m = (pat) => line.match(pat);
-              const tvgName    = m(/tvg-name="([^"]*)"/i);
-              const tvgLogo    = m(/tvg-logo="([^"]*)"/i);
-              const group      = m(/group-title="([^"]*)"/i);
-              const tvgId      = m(/tvg-id="([^"]*)"/i);
-              const tvgCountry = m(/tvg-country="([^"]*)"/i);
-              if (tvgName)    current.name    = tvgName[1]    || current.name;
-              if (tvgLogo)    current.logo    = tvgLogo[1];
-              if (group)      current.group   = group[1]      || 'Autres';
-              if (tvgId)      current.id      = 'ch_' + tvgId[1].replace(/[^a-z0-9]/gi,'_') + '_' + id;
-              if (tvgCountry) current.country = tvgCountry[1];
-
-            } else if (current && !line.startsWith('#') && /^https?:|^rtmps?:|^rtsp:/.test(line)) {
-              current.url = line;
-              channels.push(current);
-              current = null;
-
-              // Affiche les 60 premières chaînes sans attendre la fin
-              if (!firstBatchDone && channels.length >= 60) {
-                firstBatchDone = true;
-                state.channels = [...channels];
-                renderCategories();
-                loadFavorites().then(() => {});
-                renderView();
-                setStatus(`${channels.length} chaînes chargées, chargement en cours...`);
+              cur={id:'c'+(++id),name:'',group:'Autres',logo:'',url:''};
+              const ci=line.lastIndexOf(',');
+              cur.name=ci>=0?line.slice(ci+1).trim():'Ch.'+id;
+              const m=(p)=>line.match(p);
+              const tn=m(/tvg-name="([^"]*)"/i);
+              const tl=m(/tvg-logo="([^"]*)"/i);
+              const g =m(/group-title="([^"]*)"/i);
+              const ti=m(/tvg-id="([^"]*)"/i);
+              if(tn) cur.name =tn[1]||cur.name;
+              if(tl) cur.logo =tl[1];
+              if(g)  cur.group=g[1]||'Autres';
+              if(ti) cur.id  ='c_'+ti[1].replace(/[^a-z0-9]/gi,'_')+'_'+id;
+            } else if (cur && !line.startsWith('#') && /^https?:|^rtmps?:|^rtsp:/.test(line)) {
+              cur.url=line; all.push(cur); cur=null;
+              if (!firstRender && all.length>=50) {
+                firstRender=true;
+                S.channels=[...all];
+                buildCats(); renderView();
+                notify('Chargement en cours...', all.length+' chaînes affichées');
               }
             }
           }
         }
-        // Parse le reste du buffer
-        if (buffer.trim() && current) {
-          const line = buffer.trim();
-          if (/^https?:|^rtmps?:|^rtsp:/.test(line)) {
-            current.url = line;
-            channels.push(current);
-          }
+        if (buf.trim() && cur && /^https?:|^rtmps?:|^rtsp:/.test(buf.trim())) {
+          cur.url=buf.trim(); all.push(cur);
         }
       } else {
-        // Fallback : text() classique si ReadableStream non dispo
-        const text = await resp.text();
-        channels.push(...parseM3U(text));
+        const text=await resp.text();
+        all=parseM3UText(text);
       }
 
-      if (channels.length === 0) throw new Error('Aucune chaîne trouvée');
-
-      // Mise à jour finale
-      state.channels = channels;
-      renderCategories();
-      await loadFavorites();
-      renderView();
-      notify('📡', `${channels.length} chaînes chargées`, i > 0 || needProxy ? 'via proxy' : '');
+      if (!all.length) throw new Error('Aucune chaîne');
+      S.channels=all; _retries=0;
+      buildCats(); renderView();
+      notify('Prêt', all.length+' chaînes chargées');
+      document.getElementById('ch-count').style.display='';
+      document.getElementById('ch-count').textContent=all.length+' ch.';
       return;
 
-    } catch (e) {
-      lastError = e;
-      console.warn(`Tentative ${i + 1}/${urlsToTry.length} échouée :`, e.message);
+    } catch(e) {
+      console.warn('Tentative',i+1,'échouée:',e.message);
     }
   }
 
-  // Échec total — retry automatique après 8 secondes
-  console.warn('Toutes les tentatives ont échoué, retry dans 8s...');
-
-  // Affiche quand même l'interface (vide) pendant qu'on retente
-  state.channels = [];
-  renderCategories();
-  await loadFavorites();
-  renderView();
-
-  // Notif discrète et retry silencieux
-  notify('↻', 'Chargement des chaînes...', 'Nouvelle tentative en cours');
-
-  // Retry automatique jusqu'à 5 fois avec délai croissant
-  if ((loadM3UDirect._retryCount || 0) < 5) {
-    loadM3UDirect._retryCount = (loadM3UDirect._retryCount || 0) + 1;
-    const delay = Math.min(5000 * loadM3UDirect._retryCount, 30000);
-    setTimeout(async () => {
-      await loadM3UDirect(url);
-      if (state.channels.length > 0) loadM3UDirect._retryCount = 0;
-    }, delay);
+  // Échec — retry auto
+  _retries++;
+  if (_retries<=5) {
+    const delay=Math.min(5000*_retries,25000);
+    notify('Erreur réseau','Retry dans '+Math.round(delay/1000)+'s…');
+    setTimeout(()=>loadM3U(url), delay);
   } else {
-    // Abandon après 5 tentatives
-    loadM3UDirect._retryCount = 0;
-    notify('⚠️', 'Chargement échoué', 'Vérifiez votre connexion ou changez la source M3U dans ⚙ Paramètres');
+    showMsg('Impossible de charger les chaînes. Vérifiez la source M3U dans Paramètres.');
+    _retries=0;
   }
 }
 
-// ─── PARSEUR M3U INTÉGRÉ ──────────────────────────────────────────────────────
-function parseM3U(text) {
-  const lines = text.split('\n');
-  const channels = [];
-  let current = null;
-  let id = 0;
-
+function parseM3UText(text) {
+  const lines=text.split('\n');
+  const res=[]; let cur=null, id=0;
   for (const raw of lines) {
-    const line = raw.trim();
+    const line=raw.trim();
     if (!line) continue;
-
     if (line.startsWith('#EXTINF:')) {
-      current = { id: 'ch_' + (++id), name: '', group: '', country: '', logo: '', url: '' };
-
-      // Nom de la chaîne (après la dernière virgule)
-      const comma = line.lastIndexOf(',');
-      current.name = comma >= 0 ? line.slice(comma + 1).trim() : 'Chaîne ' + id;
-
-      // Attributs
-      const tvgName  = line.match(/tvg-name="([^"]*)"/i);
-      const tvgLogo  = line.match(/tvg-logo="([^"]*)"/i);
-      const group    = line.match(/group-title="([^"]*)"/i);
-      const tvgId    = line.match(/tvg-id="([^"]*)"/i);
-      const tvgCountry = line.match(/tvg-country="([^"]*)"/i);
-
-      if (tvgName)    current.name    = tvgName[1] || current.name;
-      if (tvgLogo)    current.logo    = tvgLogo[1];
-      if (group)      current.group   = group[1] || 'Autres';
-      if (tvgId)      current.id      = 'ch_' + tvgId[1].replace(/[^a-z0-9]/gi,'_') + '_' + id;
-      if (tvgCountry) current.country = tvgCountry[1];
-
-    } else if (current && !line.startsWith('#') && (line.startsWith('http') || line.startsWith('rtmp') || line.startsWith('rtsp'))) {
-      current.url = line;
-      if (current.name) channels.push(current);
-      current = null;
+      cur={id:'c'+(++id),name:'',group:'Autres',logo:'',url:''};
+      const ci=line.lastIndexOf(',');
+      cur.name=ci>=0?line.slice(ci+1).trim():'Ch.'+id;
+      const tn=line.match(/tvg-name="([^"]*)"/i);
+      const tl=line.match(/tvg-logo="([^"]*)"/i);
+      const g =line.match(/group-title="([^"]*)"/i);
+      if(tn) cur.name=tn[1]||cur.name;
+      if(tl) cur.logo=tl[1];
+      if(g)  cur.group=g[1]||'Autres';
+    } else if (cur && !line.startsWith('#') && /^https?:|^rtmps?:|^rtsp:/.test(line)) {
+      cur.url=line; res.push(cur); cur=null;
     }
   }
-
-  return channels;
+  return res;
 }
 
-async function loadFavorites() {
-  if (IS_SERVER_MODE) {
-    const data = await api('/api/favorites');
-    if (data) {
-      state.favorites = data.favorites || [];
-      updateFavBadge();
-      return;
-    }
-  }
-  // Standalone : localStorage
-  state.favorites = LS.get('favorites', []);
-  updateFavBadge();
-}
-
-async function loadSettings() {
-  if (IS_SERVER_MODE) {
-    const data = await api('/api/settings');
-    if (data) {
-      state.settings = data;
-      state.volume = data.audio?.volume ?? 80;
-      return;
-    }
-  }
-  // Standalone : localStorage avec valeurs par défaut
-  const saved = LS.get('settings', {});
-  state.settings = deepMerge(DEFAULT_SETTINGS, saved);
-  state.volume = state.settings.audio?.volume ?? 80;
-}
-
-// Fusion profonde deux objets (base + override)
-function deepMerge(base, override) {
-  const result = Object.assign({}, base);
-  for (const key of Object.keys(override || {})) {
-    if (override[key] && typeof override[key] === 'object' && !Array.isArray(override[key])) {
-      result[key] = deepMerge(base[key] || {}, override[key]);
-    } else {
-      result[key] = override[key];
-    }
-  }
-  return result;
-}
-
-// ─── RENDER CATEGORIES ────────────────────────────────────────────────────────
-function renderCategories() {
-  const list = document.getElementById('categories-list');
-  list.innerHTML = '';
-
-  const grouped = {};
-  state.channels.forEach(ch => {
-    const g = ch.group || 'Autre';
-    grouped[g] = (grouped[g] || 0) + 1;
+// ─── CATÉGORIES ───────────────────────────────────────────────────────
+function buildCats() {
+  S.cats={};
+  S.channels.forEach(ch=>{ S.cats[ch.group]=(S.cats[ch.group]||0)+1; });
+  const el=document.getElementById('cats');
+  // DocumentFragment pour 1 seul reflow
+  const frag=document.createDocumentFragment();
+  Object.entries(S.cats).sort((a,b)=>b[1]-a[1]).slice(0,35).forEach(([name,count])=>{
+    const d=document.createElement('div');
+    d.className='cat-item';
+    d.textContent=name;
+    const sp=document.createElement('span');
+    sp.className='cat-count';
+    sp.textContent=count;
+    d.appendChild(sp);
+    d.addEventListener('click',()=>selectCat(name));
+    frag.appendChild(d);
   });
+  el.innerHTML='';
+  el.appendChild(frag);
+}
 
-  const sorted = Object.entries(grouped)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 40);
-
-  sorted.forEach(([cat, count]) => {
-    const el = document.createElement('div');
-    el.className = 'cat-item focusable';
-    el.innerHTML = `
-      <span>${categoryIcon(cat)}</span>
-      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cat}</span>
-      <span class="cat-count">${count}</span>
-    `;
-    el.addEventListener('click', () => selectCategory(cat));
-    list.appendChild(el);
+function selectCat(name) {
+  S.cat=name; S.view='cat'; S.query='';
+  document.getElementById('search').value='';
+  document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.cat-item').forEach(e=>{
+    const isActive = e.firstChild?.textContent === name;
+    e.classList.toggle('active', isActive);
   });
+  S.page=0; renderView();
 }
 
-function categoryIcon(cat) {
-  const c = cat.toLowerCase();
-  if (c.includes('news') || c.includes('news') || c.includes('actualit')) return '📰';
-  if (c.includes('sport')) return '⚽';
-  if (c.includes('music') || c.includes('musique')) return '🎵';
-  if (c.includes('movie') || c.includes('film') || c.includes('cinema')) return '🎬';
-  if (c.includes('kids') || c.includes('enfant') || c.includes('jeunesse')) return '🧒';
-  if (c.includes('documentary') || c.includes('document')) return '🎥';
-  if (c.includes('entertain') || c.includes('divertis')) return '🎭';
-  if (c.includes('cook') || c.includes('cuisine')) return '🍳';
-  if (c.includes('travel') || c.includes('voyage')) return '✈️';
-  if (c.includes('weather') || c.includes('météo')) return '🌤';
-  if (c.includes('relig') || c.includes('spirit')) return '✝️';
-  return '📺';
-}
-
-// ─── VIEWS ────────────────────────────────────────────────────────────────────
+// ─── RENDU PRINCIPAL ──────────────────────────────────────────────────
 function renderView() {
-  const hero = document.getElementById('hero');
-  const section = document.getElementById('channels-section');
-  const loading = document.getElementById('loading-state');
+  let ch=[];
+  let title='';
 
-  loading.classList.remove('active');
-
-  let channels = [];
-  let title = '';
-
-  switch (state.currentView) {
-    case 'home':
-      channels = state.channels.filter(ch => ch.logo);
-      title = 'Chaînes populaires';
-      if (!state.currentCategory) {
-        hero.style.display = 'flex';
-        renderHero(channels[Math.floor(Math.random() * Math.min(20, channels.length))]);
-      }
-      break;
-
-    case 'favorites':
-      channels = state.channels.filter(ch => state.favorites.includes(ch.id));
-      title = '⭐ Mes favoris';
-      hero.style.display = 'none';
-      if (channels.length === 0) {
-        document.getElementById('channels-grid').innerHTML = `
-          <div class="empty-state" style="grid-column:1/-1">
-            <div class="empty-icon">⭐</div>
-            <div class="empty-title">Aucun favori</div>
-            <div class="empty-desc">Appuyez sur l'étoile sur une chaîne pour l'ajouter à vos favoris.</div>
-          </div>`;
-        section.style.display = 'block';
-        document.getElementById('section-title').textContent = title;
-        document.getElementById('section-count').textContent = '';
-        document.getElementById('load-more').style.display = 'none';
-        return;
-      }
-      break;
-
-    case 'recent':
-      channels = state.channels.filter(ch => state.recentChannels.includes(ch.id));
-      title = '🕐 Récemment regardés';
-      hero.style.display = 'none';
-      break;
-
-    case 'all':
-      channels = [...state.channels];
-      title = '📡 Toutes les chaînes';
-      hero.style.display = 'none';
-      break;
-
-    case 'category':
-      channels = state.channels.filter(ch => ch.group === state.currentCategory);
-      title = `${categoryIcon(state.currentCategory)} ${state.currentCategory}`;
-      hero.style.display = 'none';
-      break;
-
+  switch(S.view) {
+    case 'all':      ch=S.channels; title='Toutes les chaînes'; break;
+    case 'favorites':ch=S.channels.filter(c=>S.favs.includes(c.id)); title='Favoris'; break;
+    case 'recent':   ch=S.channels.filter(c=>S.recent.includes(c.id)); title='Récents'; break;
+    case 'cat':      ch=S.channels.filter(c=>c.group===S.cat); title=S.cat; break;
     case 'search':
-      const q = state.searchQuery.toLowerCase();
-      channels = state.channels.filter(ch =>
-        ch.name.toLowerCase().includes(q) ||
-        ch.group.toLowerCase().includes(q) ||
-        ch.country.toLowerCase().includes(q)
-      );
-      title = `🔍 "${state.searchQuery}"`;
-      hero.style.display = 'none';
+      const q=S.query.toLowerCase();
+      ch=S.channels.filter(c=>c.name.toLowerCase().includes(q)||c.group.toLowerCase().includes(q));
+      title='Résultats: "'+S.query+'"';
       break;
   }
 
-  if (state.searchQuery && state.currentView !== 'search') {
-    state.currentView = 'search';
-    renderView();
+  S.filtered=ch;
+
+  // Section bar
+  const sb=document.getElementById('section-bar');
+  sb.style.display='flex';
+  document.getElementById('sec-title').textContent=title;
+  document.getElementById('sec-count').textContent=ch.length+' chaîne'+(ch.length!==1?'s':'');
+  hideMsg();
+
+  renderPage();
+}
+
+function renderPage() {
+  const start=S.page*S.pageSize;
+  const slice=S.filtered.slice(start, start+S.pageSize);
+  const list=document.getElementById('ch-list');
+
+  if (S.filtered.length===0) {
+    list.innerHTML='<div class="msg">Aucune chaîne.</div>';
+    document.getElementById('pagination').style.display='none';
     return;
   }
 
-  state.filteredChannels = channels;
-  state.offset = 0;
+  // ── DocumentFragment : 1 seul reflow pour tout le batch ──
+  const frag=document.createDocumentFragment();
+  slice.forEach(ch=>{
+    const row=document.createElement('div');
+    row.className='ch-row'+(S.current?.id===ch.id?' playing':'');
+    row.setAttribute('data-id',ch.id);
 
-  section.style.display = 'block';
-  document.getElementById('section-title').textContent = title;
-  document.getElementById('section-count').textContent = `${channels.length} chaîne${channels.length !== 1 ? 's' : ''}`;
-  document.getElementById('load-more').style.display = channels.length > state.limit ? 'flex' : 'none';
+    // Logo (lazy loading natif du navigateur)
+    if (S.showLogos && ch.logo) {
+      const img=document.createElement('img');
+      img.className='ch-logo';
+      img.loading='lazy'; // lazy natif — pas de JS supplémentaire
+      img.decoding='async';
+      img.src=ch.logo;
+      img.alt='';
+      img.onerror=function(){this.style.display='none'};
+      row.appendChild(img);
+    } else {
+      const ini=document.createElement('div');
+      ini.className='ch-initial';
+      ini.textContent=(ch.name[0]||'?').toUpperCase();
+      row.appendChild(ini);
+    }
 
-  renderChannelGrid(channels.slice(0, state.limit));
+    const name=document.createElement('div');
+    name.className='ch-name';
+    name.textContent=ch.name;
+    row.appendChild(name);
 
-  document.getElementById('channel-count').textContent = `${state.channels.length} chaînes`;
-}
+    const grp=document.createElement('div');
+    grp.className='ch-group';
+    grp.textContent=ch.group;
+    row.appendChild(grp);
 
-function renderHero(channel) {
-  if (!channel) return;
-  document.getElementById('hero-name').textContent = channel.name;
-  document.getElementById('hero-group').textContent = channel.group || '';
-  document.getElementById('hero-country').textContent = channel.country ? `🌐 ${channel.country}` : '';
-  document.getElementById('hero').onclick = () => playChannel(channel);
-  document.getElementById('hero-play-btn').onclick = (e) => {
-    e.stopPropagation();
-    playChannel(channel);
-  };
-}
+    const fav=document.createElement('div');
+    fav.className='ch-fav'+(S.favs.includes(ch.id)?' on':'');
+    fav.textContent=S.favs.includes(ch.id)?'★':'☆';
+    fav.addEventListener('click',e=>{e.stopPropagation();toggleFav(ch.id,fav);});
+    row.appendChild(fav);
 
-function renderChannelGrid(channels) {
-  const grid = document.getElementById('channels-grid');
-  grid.innerHTML = '';
-
-  if (channels.length === 0) {
-    grid.innerHTML = `
-      <div class="empty-state" style="grid-column:1/-1">
-        <div class="empty-icon">📺</div>
-        <div class="empty-title">Aucune chaîne trouvée</div>
-        <div class="empty-desc">Essayez de modifier vos critères de recherche.</div>
-      </div>`;
-    return;
-  }
-
-  channels.forEach((ch, idx) => {
-    const card = createChannelCard(ch, idx);
-    grid.appendChild(card);
+    row.addEventListener('click',()=>play(ch));
+    frag.appendChild(row);
   });
+  list.innerHTML='';
+  list.appendChild(frag);
+
+  renderPagination();
 }
 
-function appendChannelGrid(channels) {
-  const grid = document.getElementById('channels-grid');
-  channels.forEach((ch, idx) => {
-    const card = createChannelCard(ch, idx);
-    grid.appendChild(card);
-  });
+function renderPagination() {
+  const total=Math.ceil(S.filtered.length/S.pageSize);
+  const pg=document.getElementById('pagination');
+  if (total<=1) { pg.style.display='none'; return; }
+  pg.style.display='flex';
+
+  const frag=document.createDocumentFragment();
+
+  const prev=document.createElement('button');
+  prev.className='page-btn'; prev.textContent='← Préc.';
+  prev.disabled=S.page===0;
+  prev.addEventListener('click',()=>{if(S.page>0){S.page--;renderPage();document.getElementById('content').scrollTop=0;}});
+  frag.appendChild(prev);
+
+  const info=document.createElement('div');
+  info.className='page-info' ;
+  info.style.cssText='font-size:11px;color:var(--dim);display:flex;align-items:center;padding:0 8px';
+  info.textContent=(S.page+1)+' / '+total;
+  frag.appendChild(info);
+
+  const next=document.createElement('button');
+  next.className='page-btn'; next.textContent='Suiv. →';
+  next.disabled=S.page>=total-1;
+  next.addEventListener('click',()=>{if(S.page<total-1){S.page++;renderPage();document.getElementById('content').scrollTop=0;}});
+  frag.appendChild(next);
+
+  pg.innerHTML='';
+  pg.appendChild(frag);
 }
 
-function createChannelCard(ch, idx) {
-  const card = document.createElement('div');
-  card.className = 'channel-card focusable';
-  card.setAttribute('data-id', ch.id);
-  card.setAttribute('tabindex', 0);
-
-  const isFav = state.favorites.includes(ch.id);
-  const initial = ch.name.charAt(0).toUpperCase();
-  const color = colorFromString(ch.name);
-
-  card.innerHTML = `
-    <div class="card-logo-wrap" style="background: linear-gradient(135deg, ${color}22, #00000044)">
-      ${ch.logo
-        ? `<img class="card-logo" src="${escHtml(ch.logo)}" alt="${escHtml(ch.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-        : ''
-      }
-      <div class="card-logo-fallback" style="border-color:${color}55;display:${ch.logo ? 'none' : 'flex'}">${initial}</div>
-    </div>
-    <div class="card-play-overlay"><div class="play-icon-circle">▶</div></div>
-    <div class="card-fav ${isFav ? 'active' : ''}" data-id="${ch.id}">
-      ${isFav ? '★' : '☆'}
-    </div>
-    <div class="card-info">
-      <div class="card-name">${escHtml(ch.name)}</div>
-      <div class="card-group">${escHtml(ch.group || '')}</div>
-    </div>
-  `;
-
-  card.addEventListener('click', () => playChannel(ch));
-  card.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') playChannel(ch);
-  });
-
-  const favBtn = card.querySelector('.card-fav');
-  favBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleFavoriteById(ch.id);
-  });
-
-  // Staggered entrance animation
-  card.style.opacity = '0';
-  card.style.transform = 'translateY(12px)';
-  card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-  setTimeout(() => {
-    card.style.opacity = '1';
-    card.style.transform = 'translateY(0)';
-  }, idx * 20);
-
-  return card;
+function showMsg(t) {
+  document.getElementById('msg-loading').textContent=t;
+  document.getElementById('msg-loading').style.display='';
+  document.getElementById('section-bar').style.display='none';
+  document.getElementById('ch-list').innerHTML='';
+  document.getElementById('pagination').style.display='none';
+}
+function hideMsg() {
+  document.getElementById('msg-loading').style.display='none';
 }
 
-function colorFromString(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  const h = Math.abs(hash) % 360;
-  return `hsl(${h},60%,50%)`;
-}
+// ─── LECTURE ──────────────────────────────────────────────────────────
+function play(ch) {
+  S.current=ch;
+  S.currentIdx=S.filtered.findIndex(c=>c.id===ch.id);
+  S.recent=[ch.id,...S.recent.filter(id=>id!==ch.id)].slice(0,20);
+  LS.s('recent',S.recent);
 
-function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+  document.getElementById('player-name').textContent=ch.name;
+  document.getElementById('player-meta').textContent=ch.group;
+  document.getElementById('fav-btn').textContent=S.favs.includes(ch.id)?'★':'☆';
 
-// ─── CHANNEL PLAYBACK ─────────────────────────────────────────────────────────
-function playChannel(ch) {
-  state.currentChannel = ch;
-  state.currentChannelIndex = state.filteredChannels.findIndex(c => c.id === ch.id);
-
-  // Track recent
-  state.recentChannels = [ch.id, ...state.recentChannels.filter(id => id !== ch.id)].slice(0, 20);
-
-  document.getElementById('player-name').textContent = ch.name;
-  document.getElementById('player-group').textContent = ch.group || '';
-  document.getElementById('player-country').textContent = ch.country ? `🌐 ${ch.country}` : '';
-
-  const isFav = state.favorites.includes(ch.id);
-  document.getElementById('fav-player-btn').textContent = isFav ? '★ Favori' : '☆ Favori';
-
-  showPlayer();
+  const pl=document.getElementById('player');
+  pl.className='on loading';
   startStream(ch.url);
-}
 
-function showPlayerError(msg, sub = '', isCors = false) {
-  const overlay = document.getElementById('player-overlay');
-  overlay.classList.remove('buffering');
-  overlay.classList.add('error');
-  document.getElementById('player-error-icon').textContent = isCors ? '🔒' : '📡';
-  document.getElementById('player-error-msg').textContent = msg;
-  document.getElementById('player-error-sub').textContent = sub;
-  const openBtn = document.getElementById('open-in-tab-btn');
-  if (openBtn) openBtn.style.display = isCors ? 'flex' : 'none';
-}
-
-function openStreamInTab() {
-  if (state.currentChannel?.url) {
-    window.open(state.currentChannel.url, '_blank');
-  }
+  // Marque visuellement la ligne active
+  document.querySelectorAll('.ch-row').forEach(r=>{
+    r.classList.toggle('playing',r.getAttribute('data-id')===ch.id);
+  });
 }
 
 function startStream(url) {
-  const video = document.getElementById('video-el');
-  const overlay = document.getElementById('player-overlay');
+  const video=document.getElementById('video-el');
+  const pl=document.getElementById('player');
+  pl.classList.remove('error');
+  pl.classList.add('loading');
 
-  overlay.classList.remove('error');
-  overlay.classList.add('buffering');
-  document.getElementById('player-error-sub').textContent = '';
-  const openBtn = document.getElementById('open-in-tab-btn');
-  if (openBtn) openBtn.style.display = 'none';
+  if (S.hls) { S.hls.destroy(); S.hls=null; }
+  video.removeAttribute('src'); video.load();
+  video.volume=S.vol/100; video.muted=S.muted;
 
-  // Nettoie le player précédent
-  if (state.hls) { state.hls.destroy(); state.hls = null; }
-  video.removeAttribute('src');
-  video.load();
-
-  video.volume = state.volume / 100;
-  video.muted = state.isMuted;
-
-  if (Hls.isSupported()) {
-    const hls = new Hls({
+  // HLS.js disponible ?
+  if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+    const hls=new Hls({
       enableWorker: true,
       lowLatencyMode: false,
-      backBufferLength: 30,
-      maxBufferLength: 20,
-      maxMaxBufferLength: 60,
-      // Timeouts réduits pour échouer vite sur les flux morts
+      backBufferLength: 15,
+      maxBufferLength: 15,
+      maxMaxBufferLength: 30,
       manifestLoadingTimeOut: 8000,
-      manifestLoadingMaxRetry: 1,   // 1 seul retry : évite 30s d'attente inutile
+      manifestLoadingMaxRetry: 1,
       levelLoadingTimeOut: 8000,
-      levelLoadingMaxRetry: 1,
       fragLoadingTimeOut: 10000,
-      fragLoadingMaxRetry: 2,
+      fragLoadingMaxRetry: 1,
     });
-
-    state.hls = hls;
-    hls.loadSource(url);
-    hls.attachMedia(video);
-
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      overlay.classList.remove('buffering');
-      video.play().catch(() => {
-        document.getElementById('play-pause-btn').textContent = '▶';
-      });
+    S.hls=hls;
+    hls.loadSource(url); hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+      pl.classList.remove('loading');
+      video.play().catch(()=>{});
     });
-
-    hls.on(Hls.Events.ERROR, (ev, data) => {
-      if (!data.fatal) return; // erreurs non-fatales : HLS.js gère seul
-
-      const isCorsError = data.response?.code === 0 ||
-        (data.networkDetails && data.networkDetails.status === 0) ||
-        data.details === 'manifestLoadError' ||
-        data.details === 'levelLoadError';
-
-      hls.destroy(); state.hls = null;
-
-      if (isCorsError) {
-        // Erreur réseau code 0 = bloqué par CORS ou flux mort
-        // On tente d'abord la lecture native avant de déclarer CORS
-        video.src = url;
-        video.load();
-        video.play()
-          .then(() => overlay.classList.remove('buffering'))
-          .catch(() => {
-            showPlayerError(
-              'Flux bloqué (CORS)',
-              `Ce flux (${new URL(url).hostname}) interdit les lectures depuis un navigateur.\nSolution : installer le serveur Node.js (Raspberry Pi/Linux) qui proxy les flux.`,
-              true
-            );
-          });
-      } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-        hls.recoverMediaError?.();
-      } else {
-        showPlayerError('Flux indisponible', 'Ce flux est peut-être hors ligne ou le format n\'est pas supporté.');
-      }
+    hls.on(Hls.Events.ERROR,(ev,d)=>{
+      if (!d.fatal) return;
+      hls.destroy(); S.hls=null;
+      // Tente la lecture native
+      video.src=url; video.load();
+      video.play().then(()=>pl.classList.remove('loading'))
+        .catch(()=>showErr('Flux indisponible ou bloqué (CORS)'));
     });
-
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    // Safari / iOS natif
-    video.src = url;
-    video.load();
-    video.addEventListener('loadedmetadata', () => {
-      overlay.classList.remove('buffering');
-      video.play().catch(() => {});
-    }, { once: true });
-    video.addEventListener('error', () => {
-      showPlayerError('Flux indisponible', 'Format non supporté sur ce navigateur.');
-    }, { once: true });
-
+    video.src=url; video.load();
+    video.addEventListener('loadedmetadata',()=>{pl.classList.remove('loading');video.play().catch(()=>{});},{once:true});
+    video.addEventListener('error',()=>showErr('Flux indisponible'),{once:true});
   } else {
-    tryNativePlayback(url);
+    video.src=url; video.load();
+    video.play().then(()=>pl.classList.remove('loading')).catch(()=>showErr('Format non supporté'));
   }
 
-  video.onwaiting = () => overlay.classList.add('buffering');
-  video.onplaying  = () => overlay.classList.remove('buffering');
+  video.onwaiting=()=>pl.classList.add('loading');
+  video.onplaying =()=>pl.classList.remove('loading');
 }
 
-// Lecture native (MP4, TS direct, etc.)
-function tryNativePlayback(url) {
-  const video = document.getElementById('video-el');
-  const overlay = document.getElementById('player-overlay');
-  video.src = url;
-  video.load();
-  video.play()
-    .then(() => overlay.classList.remove('buffering'))
-    .catch(() => showPlayerError('Flux indisponible', 'Ce flux est hors ligne ou le format n\'est pas supporté.'));
-}
-
-function showPlayer() {
-  const overlay = document.getElementById('player-overlay');
-  overlay.classList.add('active', 'controls-visible');
-  resetControlsTimer();
+function showErr(msg) {
+  const pl=document.getElementById('player');
+  pl.classList.remove('loading'); pl.classList.add('error');
+  document.getElementById('err-msg').textContent=msg;
 }
 
 function closePlayer() {
-  const overlay = document.getElementById('player-overlay');
-  overlay.classList.remove('active', 'controls-visible', 'buffering', 'error');
-  const video = document.getElementById('video-el');
-  video.pause();
-  if (state.hls) { state.hls.destroy(); state.hls = null; }
-  video.src = '';
-  clearTimeout(state.controlsTimeout);
+  const pl=document.getElementById('player');
+  pl.className='';
+  document.getElementById('video-el').pause();
+  if (S.hls){S.hls.destroy();S.hls=null;}
+  document.getElementById('video-el').src='';
+  S.current=null;
+  document.querySelectorAll('.ch-row').forEach(r=>r.classList.remove('playing'));
 }
 
-function togglePlayPause() {
-  const video = document.getElementById('video-el');
-  if (video.paused) {
-    video.play();
-    document.getElementById('play-pause-btn').textContent = '⏸';
-  } else {
-    video.pause();
-    document.getElementById('play-pause-btn').textContent = '▶';
-  }
+function togglePP() {
+  const v=document.getElementById('video-el');
+  const btn=document.getElementById('pp-btn');
+  if(v.paused){v.play();btn.textContent='⏸';}
+  else{v.pause();btn.textContent='▶';}
 }
 
-function nextChannel() {
-  const channels = state.filteredChannels;
-  if (!channels.length) return;
-  state.currentChannelIndex = (state.currentChannelIndex + 1) % channels.length;
-  playChannel(channels[state.currentChannelIndex]);
+function nextCh() {
+  if(!S.filtered.length)return;
+  S.currentIdx=(S.currentIdx+1)%S.filtered.length;
+  play(S.filtered[S.currentIdx]);
+}
+function prevCh() {
+  if(!S.filtered.length)return;
+  S.currentIdx=(S.currentIdx-1+S.filtered.length)%S.filtered.length;
+  play(S.filtered[S.currentIdx]);
+}
+function retryStream() { if(S.current)startStream(S.current.url); }
+function toggleFS() {
+  if(!document.fullscreenElement) document.getElementById('player').requestFullscreen().catch(()=>{});
+  else document.exitFullscreen();
 }
 
-function prevChannel() {
-  const channels = state.filteredChannels;
-  if (!channels.length) return;
-  state.currentChannelIndex = (state.currentChannelIndex - 1 + channels.length) % channels.length;
-  playChannel(channels[state.currentChannelIndex]);
+// ─── FAVORIS ──────────────────────────────────────────────────────────
+function toggleFav(id, btn) {
+  const on=S.favs.includes(id);
+  S.favs=on?S.favs.filter(f=>f!==id):[...S.favs,id];
+  LS.s('favs',S.favs);
+  if(btn){btn.classList.toggle('on',!on);btn.textContent=on?'☆':'★';}
+  updateFavCount();
+  notify(on?'Retiré des favoris':'Ajouté aux favoris');
+}
+function toggleFavCurrent() {
+  if(!S.current)return;
+  const id=S.current.id;
+  const btn=document.getElementById('fav-btn');
+  const on=S.favs.includes(id);
+  S.favs=on?S.favs.filter(f=>f!==id):[...S.favs,id];
+  LS.s('favs',S.favs);
+  btn.textContent=on?'☆':'★';
+  // Met à jour la ligne dans la liste
+  const rowFav=document.querySelector(`.ch-row[data-id="${id}"] .ch-fav`);
+  if(rowFav){rowFav.classList.toggle('on',!on);rowFav.textContent=on?'☆':'★';}
+  updateFavCount();
+}
+function updateFavCount() {
+  const item=document.querySelector('[data-view="favorites"]');
+  if(item) item.textContent='★ Favoris ('+S.favs.length+')';
 }
 
-function retryStream() {
-  if (state.currentChannel) {
-    startStream(state.currentChannel.url);
-  }
-}
-
-function toggleFullscreen() {
-  const el = document.getElementById('player-overlay');
-  if (!document.fullscreenElement) {
-    el.requestFullscreen().catch(() => {});
-  } else {
-    document.exitFullscreen();
-  }
-}
-
-function resetControlsTimer() {
-  const overlay = document.getElementById('player-overlay');
-  overlay.classList.add('controls-visible');
-  clearTimeout(state.controlsTimeout);
-  state.controlsTimeout = setTimeout(() => {
-    overlay.classList.remove('controls-visible');
-  }, 3500);
-}
-
-// ─── FAVORITES ────────────────────────────────────────────────────────────────
-async function toggleFavoriteById(id) {
-  const isFav = state.favorites.includes(id);
-  const action = isFav ? 'remove' : 'add';
-
-  if (IS_SERVER_MODE) {
-    await api('/api/favorites', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channelId: id, action }),
-    });
-  }
-
-  if (isFav) {
-    state.favorites = state.favorites.filter(f => f !== id);
-  } else {
-    state.favorites.push(id);
-  }
-
-  // Persistance locale (standalone)
-  if (!IS_SERVER_MODE) LS.set('favorites', state.favorites);
-
-  // Update card UI
-  const card = document.querySelector(`.channel-card[data-id="${id}"]`);
-  if (card) {
-    const favBtn = card.querySelector('.card-fav');
-    if (isFav) {
-      favBtn.classList.remove('active');
-      favBtn.textContent = '☆';
-    } else {
-      favBtn.classList.add('active');
-      favBtn.textContent = '★';
-    }
-  }
-
-  updateFavBadge();
-  notify(isFav ? '☆' : '★', isFav ? 'Retiré des favoris' : 'Ajouté aux favoris', state.currentChannel?.name || '');
-}
-
-function toggleFavorite() {
-  if (state.currentChannel) toggleFavoriteById(state.currentChannel.id);
-}
-
-function updateFavBadge() {
-  document.getElementById('fav-count').textContent = state.favorites.length;
-}
-
-// ─── NAVIGATION ───────────────────────────────────────────────────────────────
-function selectCategory(cat) {
-  state.currentCategory = cat;
-  state.currentView = 'category';
-  state.searchQuery = '';
-  document.getElementById('search-input').value = '';
-
-  // Update active states
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.cat-item').forEach(el => {
-    el.classList.toggle('active', el.querySelector('span:nth-child(2)')?.textContent === cat);
-  });
-
-  renderView();
-}
-
-document.querySelectorAll('.nav-item').forEach(item => {
-  item.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.cat-item').forEach(el => el.classList.remove('active'));
+// ─── NAVIGATION ───────────────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click',()=>{
+    document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+    document.querySelectorAll('.cat-item').forEach(e=>e.classList.remove('active'));
     item.classList.add('active');
-    state.currentCategory = null;
-    state.currentView = item.dataset.view;
-    state.searchQuery = '';
-    document.getElementById('search-input').value = '';
-    if (state.isLoaded) renderView();
+    S.view=item.dataset.view; S.cat=null; S.query=''; S.page=0;
+    document.getElementById('search').value='';
+    renderView();
   });
 });
 
-// Load more
-document.getElementById('load-more-btn').addEventListener('click', () => {
-  state.offset += state.limit;
-  const more = state.filteredChannels.slice(state.offset, state.offset + state.limit);
-  appendChannelGrid(more);
-  if (state.offset + state.limit >= state.filteredChannels.length) {
-    document.getElementById('load-more').style.display = 'none';
-  }
+let _searchTO;
+document.getElementById('search').addEventListener('input',e=>{
+  clearTimeout(_searchTO);
+  _searchTO=setTimeout(()=>{
+    S.query=e.target.value.trim(); S.page=0;
+    S.view=S.query?'search':'all';
+    renderView();
+  },300);
 });
 
-// Search
-let searchTimeout;
-document.getElementById('search-input').addEventListener('input', (e) => {
-  clearTimeout(searchTimeout);
-  const q = e.target.value.trim();
-  searchTimeout = setTimeout(() => {
-    state.searchQuery = q;
-    if (q) {
-      state.currentView = 'search';
-    } else {
-      state.currentView = 'home';
-    }
-    if (state.isLoaded) renderView();
-  }, 300);
+document.getElementById('refresh-btn').addEventListener('click',()=>{
+  S.channels=[]; S.page=0;
+  showMsg('Chargement...');
+  loadM3U(S.m3uUrl);
 });
 
-// Refresh
-document.getElementById('refresh-btn').addEventListener('click', async () => {
-  notify('↻', 'Actualisation', 'Chargement des chaînes...');
-  if (IS_SERVER_MODE) await api('/api/refresh', { method: 'POST' });
-  await loadChannels();
-  notify('✓', 'Actualisé', `${state.channels.length} chaînes chargées`);
+// ─── VOLUME ───────────────────────────────────────────────────────────
+document.getElementById('vol').addEventListener('input',e=>{
+  S.vol=+e.target.value;
+  document.getElementById('vol-display').textContent=S.vol;
+  document.getElementById('video-el').volume=S.vol/100;
 });
 
-// ─── SETTINGS ─────────────────────────────────────────────────────────────────
-const SETTINGS_PANELS = {
-  display: () => `
-    <div class="settings-group">
-      <div class="settings-group-title">Résolution & Affichage</div>
-      ${settingSelect('Résolution', 'Résolution de sortie HDMI', 'display.resolution', ['auto','1920x1080','1280x720','1024x768','3840x2160'])}
-      ${settingSlider('Luminosité', 'Luminosité de l\'écran', 'display.brightness', 0, 100, '%')}
-      ${settingSlider('Contraste', 'Contraste de l\'image', 'display.contrast', 50, 150, '%')}
-      ${settingSlider('Saturation', 'Saturation des couleurs', 'display.saturation', 0, 200, '%')}
-    </div>
-    <div class="settings-group">
-      <div class="settings-group-title">Options HDMI</div>
-      ${settingToggle('Mode HDMI auto', 'Détection automatique du mode HDMI', 'display.hdmiMode')}
-      ${settingToggle('Overscan', 'Compenser le débordement d\'écran', 'display.overscan')}
-    </div>`,
-
-  audio: () => `
-    <div class="settings-group">
-      <div class="settings-group-title">Volume & Sortie</div>
-      ${settingSlider('Volume', 'Volume principal', 'audio.volume', 0, 100, '%')}
-      ${settingSelect('Sortie audio', 'Destination du son', 'audio.output', ['hdmi','analog','bluetooth'])}
-    </div>
-    <div class="settings-group">
-      <div class="settings-group-title">Options audio</div>
-      ${settingSelect('Égaliseur', 'Profil audio', 'audio.equalizer', ['flat','bass boost','treble boost','cinema','speech'])}
-      ${settingToggle('Son surround', 'Activer le son surround (si disponible)', 'audio.surround')}
-    </div>`,
-
-  video: () => `
-    <div class="settings-group">
-      <div class="settings-group-title">Lecture vidéo</div>
-      ${settingToggle('Désentrelacement', 'Améliore les vidéos entrelacées', 'video.deinterlace')}
-      ${settingToggle('Accélération matérielle', 'Utilise le GPU du Pi pour décoder', 'video.hardwareAccel')}
-      ${settingSelect('Ratio d\'aspect', 'Format d\'affichage', 'video.aspectRatio', ['16:9','4:3','auto','stretch'])}
-      ${settingSelect('Qualité', 'Qualité du flux vidéo', 'video.quality', ['auto','1080p','720p','480p'])}
-    </div>
-    <div class="settings-group">
-      <div class="settings-group-title">Buffer</div>
-      ${settingSlider('Taille du buffer', 'En secondes', 'video.bufferSize', 1, 15, 's')}
-    </div>`,
-
-  keyboard: () => `
-    <div class="settings-group">
-      <div class="settings-group-title">Navigation</div>
-      ${keyBind('Haut', 'keyboard.up')}
-      ${keyBind('Bas', 'keyboard.down')}
-      ${keyBind('Gauche', 'keyboard.left')}
-      ${keyBind('Droite', 'keyboard.right')}
-      ${keyBind('Sélectionner', 'keyboard.select')}
-      ${keyBind('Retour', 'keyboard.back')}
-    </div>
-    <div class="settings-group">
-      <div class="settings-group-title">Lecture</div>
-      ${keyBind('Volume +', 'keyboard.volumeUp')}
-      ${keyBind('Volume -', 'keyboard.volumeDown')}
-      ${keyBind('Muet', 'keyboard.mute')}
-      ${keyBind('Plein écran', 'keyboard.fullscreen')}
-      ${keyBind('Chaîne suivante', 'keyboard.channelUp')}
-      ${keyBind('Chaîne précédente', 'keyboard.channelDown')}
-      ${keyBind('Info chaîne', 'keyboard.info')}
-      ${keyBind('Paramètres', 'keyboard.settings')}
-      ${keyBind('Recherche', 'keyboard.search')}
-    </div>`,
-
-  gamepad: () => `
-    <div class="settings-group">
-      <div class="settings-group-title">Manette de jeu</div>
-      ${settingToggle('Activer la manette', 'Permet de contrôler avec une manette', 'input.gamepad.enabled')}
-      ${settingSlider('Zone morte', 'Sensibilité du stick', 'input.gamepad.deadzone', 0, 0.5, '')}
-      ${settingToggle('Vibration', 'Vibration de retour (si supporté)', 'input.gamepad.rumble')}
-    </div>
-    <div class="settings-group">
-      <div class="settings-group-title">Télécommande IR</div>
-      ${settingToggle('Activer la télécommande', 'Support infrarouge (LIRC)', 'input.remote.enabled')}
-    </div>
-    <div class="settings-group">
-      <div class="settings-group-title">Boutons de la manette</div>
-      <div class="setting-row"><div class="setting-label"><div class="setting-name">Navigation</div><div class="setting-desc">Croix directionnelle / Stick gauche</div></div></div>
-      <div class="setting-row"><div class="setting-label"><div class="setting-name">Lecture/Pause</div><div class="setting-desc">Bouton A / Croix</div></div></div>
-      <div class="setting-row"><div class="setting-label"><div class="setting-name">Retour</div><div class="setting-desc">Bouton B / Cercle</div></div></div>
-      <div class="setting-row"><div class="setting-label"><div class="setting-name">Favoris</div><div class="setting-desc">Bouton Y / Triangle</div></div></div>
-      <div class="setting-row"><div class="setting-label"><div class="setting-name">Chaîne suivante</div><div class="setting-desc">RB / R1</div></div></div>
-      <div class="setting-row"><div class="setting-label"><div class="setting-name">Chaîne précédente</div><div class="setting-desc">LB / L1</div></div></div>
-      <div class="setting-row"><div class="setting-label"><div class="setting-name">Volume +/-</div><div class="setting-desc">RT / LT</div></div></div>
-    </div>`,
-
-  interface: () => `
-    <div class="settings-group">
-      <div class="settings-group-title">Apparence</div>
-      ${settingToggle('Animations', 'Activer les animations d\'interface', 'interface.animations')}
-      ${settingToggle('Horloge 24h', 'Format d\'heure 24 heures', 'interface.clock24h')}
-    </div>
-    <div class="settings-group">
-      <div class="settings-group-title">Économiseur d\'écran</div>
-      ${settingSelect('Délai d\'activation', 'Temps avant activation', 'interface.screensaver',
-          ['60', '120', '300', '600', '0'], ['1 min', '2 min', '5 min', '10 min', 'Désactivé'])}
-    </div>`,
-
-  network: () => `
-    <div class="settings-group">
-      <div class="settings-group-title">Connexion</div>
-      ${settingToggle('DNS local', 'Utiliser un serveur DNS local', 'network.useLocalDNS')}
-      ${settingSlider('Timeout', 'Délai de connexion en secondes', 'network.timeout', 3, 30, 's')}
-      ${settingSlider('Tentatives', 'Nombre de tentatives', 'network.retries', 1, 10, '')}
-    </div>`,
-
-  system: () => `
-    <div class="settings-group">
-      <div class="settings-group-title">Informations système</div>
-      <div id="system-info-rows"><div class="setting-row"><div class="setting-label"><div class="setting-desc">Chargement...</div></div></div></div>
-    </div>
-    <div class="settings-group">
-      <div class="settings-group-title">Source IPTV (M3U)</div>
-      <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:10px;padding:16px">
-        <div class="setting-label">
-          <div class="setting-name">Listes prédéfinies</div>
-          <div class="setting-desc">Cliquez pour sélectionner</div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:6px;width:100%">
-          ${[
-            ['🇫🇷 France uniquement', 'https://iptv-org.github.io/iptv/languages/fra.m3u'],
-            ['🇬🇧 English channels', 'https://iptv-org.github.io/iptv/languages/eng.m3u'],
-            ['🌍 Monde entier (lent)', 'https://iptv-org.github.io/iptv/index.m3u'],
-            ['📺 Francophones (FR+BE+CH)', 'https://iptv-org.github.io/iptv/languages/fra.m3u'],
-          ].map(([label, url]) => `
-            <button onclick="document.getElementById('m3u-url-input').value='${url}'"
-              style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;color:var(--text-dim);font-family:'Rajdhani',sans-serif;font-size:13px;cursor:pointer;text-align:left;transition:var(--transition)"
-              onmouseover="this.style.borderColor='rgba(0,229,255,0.4)';this.style.color='var(--text)'"
-              onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">${label}</button>`).join('')}
-        </div>
-        <div class="setting-label" style="margin-top:4px">
-          <div class="setting-name">URL personnalisée</div>
-          <div class="setting-desc">Votre propre liste M3U ou IPTV payant</div>
-        </div>
-        <input type="text" id="m3u-url-input"
-          value="${state.settings?.iptv?.m3uUrl || DEFAULT_M3U_URL}"
-          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none"
-          placeholder="https://...">
-        <button onclick="applyM3UUrl()" style="background:var(--accent);border:none;border-radius:var(--radius-sm);padding:8px 20px;color:var(--bg);font-family:'Rajdhani',sans-serif;font-weight:700;cursor:pointer;font-size:14px;letter-spacing:0.05em">
-          ↻ Appliquer &amp; Recharger
-        </button>
-      </div>
-    </div>
-    <div class="settings-group">
-      <div class="settings-group-title">Actions</div>
-      <div class="setting-row" style="cursor:pointer" onclick="doRefresh()">
-        <div class="setting-label">
-          <div class="setting-name">↻ Actualiser les chaînes</div>
-          <div class="setting-desc">Recharger la liste depuis la source M3U</div>
-        </div>
-      </div>
-      <div class="setting-row" style="cursor:pointer" onclick="clearCache()">
-        <div class="setting-label">
-          <div class="setting-name">🗑 Vider le cache</div>
-          <div class="setting-desc">Supprimer les données en cache</div>
-        </div>
-      </div>
-    </div>`,
-};
-
-function settingSlider(name, desc, key, min, max, unit) {
-  const val = getNestedSetting(key) ?? 50;
-  return `<div class="setting-row">
-    <div class="setting-label">
-      <div class="setting-name">${name}</div>
-      <div class="setting-desc">${desc}</div>
-    </div>
-    <div class="setting-control" style="display:flex;gap:8px;align-items:center">
-      <input type="range" class="setting-slider" min="${min}" max="${max}" value="${val}"
-        data-key="${key}" oninput="this.nextElementSibling.textContent=this.value+'${unit}'">
-      <span class="slider-value">${val}${unit}</span>
-    </div>
-  </div>`;
-}
-
-function settingToggle(name, desc, key) {
-  const val = getNestedSetting(key);
-  return `<div class="setting-row">
-    <div class="setting-label">
-      <div class="setting-name">${name}</div>
-      <div class="setting-desc">${desc}</div>
-    </div>
-    <div class="setting-control">
-      <div class="toggle ${val ? 'on' : ''}" data-key="${key}" onclick="this.classList.toggle('on')"></div>
-    </div>
-  </div>`;
-}
-
-function settingSelect(name, desc, key, opts, labels) {
-  const val = getNestedSetting(key);
-  const optHtml = opts.map((o, i) =>
-    `<option value="${o}" ${o === val ? 'selected' : ''}>${(labels || opts)[i]}</option>`
-  ).join('');
-  return `<div class="setting-row">
-    <div class="setting-label">
-      <div class="setting-name">${name}</div>
-      <div class="setting-desc">${desc}</div>
-    </div>
-    <div class="setting-control">
-      <select class="setting-select" data-key="${key}">${optHtml}</select>
-    </div>
-  </div>`;
-}
-
-function keyBind(name, key) {
-  const val = getNestedSetting('input.' + key) || '?';
-  return `<div class="setting-row">
-    <div class="setting-label"><div class="setting-name">${name}</div></div>
-    <div class="setting-control">
-      <div class="key-bind" data-key="input.${key}" onclick="startKeyListen(this)">${val}</div>
-    </div>
-  </div>`;
-}
-
-function getNestedSetting(key) {
-  if (!state.settings) return null;
-  const parts = key.split('.');
-  let obj = state.settings;
-  for (const p of parts) { obj = obj?.[p]; }
-  return obj;
-}
-
-function setNestedSetting(key, value, obj) {
-  const parts = key.split('.');
-  let ref = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    if (!ref[parts[i]]) ref[parts[i]] = {};
-    ref = ref[parts[i]];
-  }
-  ref[parts[parts.length - 1]] = value;
-}
-
-let activeSettingsTab = 'display';
-
-function openSettings() {
-  document.getElementById('settings-overlay').classList.add('active');
-  renderSettingsTab(activeSettingsTab);
-  if (activeSettingsTab === 'system') loadSystemInfo();
-}
-
-function closeSettings() {
-  document.getElementById('settings-overlay').classList.remove('active');
-}
-
-function renderSettingsTab(tab) {
-  activeSettingsTab = tab;
-  document.querySelectorAll('.settings-tab').forEach(el => {
-    el.classList.toggle('active', el.dataset.tab === tab);
-  });
-  const body = document.getElementById('settings-body');
-  body.innerHTML = SETTINGS_PANELS[tab]?.() || '';
-
-  if (tab === 'system') loadSystemInfo();
-}
-
-document.querySelectorAll('.settings-tab').forEach(el => {
-  el.addEventListener('click', () => renderSettingsTab(el.dataset.tab));
-});
-
-document.getElementById('settings-btn').addEventListener('click', openSettings);
-document.getElementById('settings-overlay').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('settings-overlay')) closeSettings();
-});
-
-async function saveSettings() {
-  const newSettings = JSON.parse(JSON.stringify(state.settings));
-
-  // Collect slider values
-  document.querySelectorAll('.setting-slider[data-key]').forEach(el => {
-    setNestedSetting(el.dataset.key, parseFloat(el.value), newSettings);
-  });
-  // Collect toggles
-  document.querySelectorAll('.toggle[data-key]').forEach(el => {
-    setNestedSetting(el.dataset.key, el.classList.contains('on'), newSettings);
-  });
-  // Collect selects
-  document.querySelectorAll('.setting-select[data-key]').forEach(el => {
-    setNestedSetting(el.dataset.key, el.value, newSettings);
-  });
-  // Collect key binds
-  document.querySelectorAll('.key-bind[data-key]').forEach(el => {
-    setNestedSetting(el.dataset.key, el.textContent, newSettings);
-  });
-
-  if (IS_SERVER_MODE) {
-    const data = await api('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newSettings),
-    });
-    if (data?.success) {
-      state.settings = data.settings;
-      state.volume = state.settings.audio?.volume ?? 80;
-      notify('💾', 'Paramètres sauvegardés', 'Les modifications sont appliquées');
-      closeSettings();
-      return;
-    }
-  }
-
-  // Standalone : sauvegarde dans localStorage
-  state.settings = newSettings;
-  state.volume = newSettings.audio?.volume ?? 80;
-  LS.set('settings', newSettings);
-  notify('💾', 'Paramètres sauvegardés', IS_SERVER_MODE ? 'Serveur indisponible — sauvegarde locale' : 'Sauvegarde locale');
-  closeSettings();
-}
-
-async function loadSystemInfo() {
-  const el = document.getElementById('system-info-rows');
-  if (!el) return;
-
-  let rows = [];
-
-  if (IS_SERVER_MODE) {
-    const data = await api('/api/system');
-    const status = await api('/api/status');
-    if (data) {
-      rows = [
-        ['Hostname', data.hostname],
-        ['Plateforme', `${data.platform} (${data.arch})`],
-        ['Node.js', data.nodeVersion],
-        ['CPU', `${data.cpus} cœur(s)`],
-        ['RAM totale', formatBytes(data.memory?.total)],
-        ['RAM libre', formatBytes(data.memory?.free)],
-        ['Uptime serveur', formatUptime(data.uptime)],
-        ['Chaînes chargées', status?.channels || '—'],
-        ['Catégories', status?.categories || '—'],
-        ['Version PiTV', '1.0.0'],
-      ];
-    }
-  }
-
-  if (!rows.length) {
-    rows = [
-      ['Mode', IS_SERVER_MODE ? 'Serveur (indisponible)' : 'Standalone (fichier local)'],
-      ['Navigateur', navigator.userAgent.split(' ').slice(-2).join(' ')],
-      ['Chaînes chargées', state.channels.length],
-      ['Catégories', new Set(state.channels.map(c => c.group)).size],
-      ['Favoris', state.favorites.length],
-      ['Source M3U', state.settings?.iptv?.m3uUrl || DEFAULT_M3U_URL],
-      ['Version PiTV', '1.0.0'],
-    ];
-  }
-
-  el.innerHTML = rows.map(([k, v]) => `
-    <div class="setting-row">
-      <div class="setting-label"><div class="setting-name">${k}</div></div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent)">${v}</div>
-    </div>`).join('');
-}
-
-function formatBytes(b) {
-  if (!b) return '—';
-  const g = b / 1024 / 1024 / 1024;
-  const m = b / 1024 / 1024;
-  return g >= 1 ? `${g.toFixed(1)} GB` : `${Math.round(m)} MB`;
-}
-
-function formatUptime(s) {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return `${h}h ${m}m`;
-}
-
-// Key listening for keybinds
-function startKeyListen(el) {
-  if (state.listeningForKey) {
-    state.listeningForKey.classList.remove('listening');
-  }
-  el.classList.add('listening');
-  el.textContent = '...';
-  state.listeningForKey = el;
-}
-
-document.addEventListener('keydown', (e) => {
-  if (state.listeningForKey) {
-    e.preventDefault();
-    state.listeningForKey.textContent = e.key;
-    state.listeningForKey.classList.remove('listening');
-    state.listeningForKey = null;
+// ─── CLAVIER ──────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  const playerOn=document.getElementById('player').classList.contains('on');
+  if (playerOn) {
+    if(e.key==='Escape'||e.key==='Backspace')closePlayer();
+    else if(e.key===' '){e.preventDefault();togglePP();}
+    else if(e.key==='ArrowRight')nextCh();
+    else if(e.key==='ArrowLeft')prevCh();
+    else if(e.key==='ArrowUp'){S.vol=Math.min(100,S.vol+5);document.getElementById('vol').value=S.vol;document.getElementById('vol-display').textContent=S.vol;document.getElementById('video-el').volume=S.vol/100;}
+    else if(e.key==='ArrowDown'){S.vol=Math.max(0,S.vol-5);document.getElementById('vol').value=S.vol;document.getElementById('vol-display').textContent=S.vol;document.getElementById('video-el').volume=S.vol/100;}
+    else if(e.key==='f'||e.key==='F')toggleFS();
+    else if(e.key==='m'||e.key==='M'){S.muted=!S.muted;document.getElementById('video-el').muted=S.muted;}
     return;
   }
-
-  const settings = state.settings?.input?.keyboard;
-  if (!settings) return;
-
-  // Player shortcuts
-  if (document.getElementById('player-overlay').classList.contains('active')) {
-    resetControlsTimer();
-    if (e.key === settings.volumeUp) adjustVolume(5);
-    else if (e.key === settings.volumeDown) adjustVolume(-5);
-    else if (e.key === settings.mute) toggleMute();
-    else if (e.key === settings.back || e.key === 'Escape') closePlayer();
-    else if (e.key === settings.select || e.key === ' ') { e.preventDefault(); togglePlayPause(); }
-    else if (e.key === settings.channelUp) nextChannel();
-    else if (e.key === settings.channelDown) prevChannel();
-    else if (e.key === settings.fullscreen) toggleFullscreen();
-    return;
-  }
-
-  if (e.key === settings.settings) openSettings();
-  else if (e.key === settings.search) document.getElementById('search-input').focus();
+  if(e.key==='/'||e.key==='s'){document.getElementById('search').focus();e.preventDefault();}
 });
 
-function adjustVolume(delta) {
-  state.volume = Math.max(0, Math.min(100, state.volume + delta));
-  const video = document.getElementById('video-el');
-  video.volume = state.volume / 100;
-  document.getElementById('player-volume').value = state.volume;
-  document.getElementById('volume-display').textContent = state.volume;
-}
-
-function toggleMute() {
-  const video = document.getElementById('video-el');
-  state.isMuted = !state.isMuted;
-  video.muted = state.isMuted;
-}
-
-// Volume slider
-document.getElementById('player-volume').addEventListener('input', (e) => {
-  state.volume = parseInt(e.target.value);
-  document.getElementById('video-el').volume = state.volume / 100;
-  document.getElementById('volume-display').textContent = state.volume;
+// ─── SETTINGS ─────────────────────────────────────────────────────────
+document.getElementById('settings-btn').addEventListener('click',()=>{
+  document.getElementById('m3u-input').value=S.m3uUrl;
+  document.getElementById('show-logos').checked=S.showLogos;
+  document.getElementById('page-size').value=S.pageSize;
+  document.getElementById('init-vol').value=S.vol;
+  document.getElementById('init-vol-display').textContent=S.vol;
+  document.getElementById('settings').classList.add('on');
 });
-
-// Player controls visibility
-document.getElementById('player-overlay').addEventListener('mousemove', resetControlsTimer);
-document.getElementById('player-overlay').addEventListener('touchstart', resetControlsTimer);
-
-// ─── GAMEPAD ──────────────────────────────────────────────────────────────────
-window.addEventListener('gamepadconnected', (e) => {
-  state.gamepadConnected = true;
-  document.getElementById('gamepad-indicator').classList.add('visible');
-  notify('🎮', 'Manette connectée', e.gamepad.id);
-  startGamepadLoop();
+document.getElementById('init-vol').addEventListener('input',e=>{
+  document.getElementById('init-vol-display').textContent=e.target.value;
 });
-
-window.addEventListener('gamepaddisconnected', () => {
-  state.gamepadConnected = false;
-  document.getElementById('gamepad-indicator').classList.remove('visible');
-  clearInterval(state.gamepadInterval);
-});
-
-function startGamepadLoop() {
-  let prevButtons = [];
-  state.gamepadInterval = setInterval(() => {
-    const gp = navigator.getGamepads?.()[0];
-    if (!gp) return;
-
-    const buttons = gp.buttons.map(b => b.pressed);
-    const changed = buttons.filter((b, i) => b !== prevButtons[i]);
-    prevButtons = buttons;
-
-    // Standard gamepad mapping
-    if (buttons[0] && !prevButtons[0]) { // A - select
-      document.activeElement?.click?.();
-    }
-    if (buttons[1] && !prevButtons[1]) { // B - back
-      if (document.getElementById('player-overlay').classList.contains('active')) closePlayer();
-    }
-    if (buttons[4] && !prevButtons[4]) prevChannel(); // LB
-    if (buttons[5] && !prevButtons[5]) nextChannel(); // RB
-    if (buttons[6]) adjustVolume(-2); // LT
-    if (buttons[7]) adjustVolume(2);  // RT
-
-    // D-pad
-    if (buttons[12] && !prevButtons[12]) navigate('up');
-    if (buttons[13] && !prevButtons[13]) navigate('down');
-    if (buttons[14] && !prevButtons[14]) navigate('left');
-    if (buttons[15] && !prevButtons[15]) navigate('right');
-
-    if (buttons[3] && !prevButtons[3]) toggleFavorite(); // Y/Triangle
-
-    // Axis navigation
-    const ax = gp.axes;
-    if (Math.abs(ax[0]) > 0.5 || Math.abs(ax[1]) > 0.5) {
-      // Handled separately to avoid spam
-    }
-  }, 100);
-}
-
-function navigate(dir) {
-  const focused = document.querySelector('.focusable:focus');
-  if (!focused) {
-    const first = document.querySelector('.focusable');
-    first?.focus();
-    return;
-  }
-  const all = [...document.querySelectorAll('.focusable:not([style*="display:none"])')];
-  const idx = all.indexOf(focused);
-  if (dir === 'down' || dir === 'right') all[Math.min(idx + 1, all.length - 1)]?.focus();
-  else all[Math.max(idx - 1, 0)]?.focus();
-}
-
-// ─── CLOCK ────────────────────────────────────────────────────────────────────
-function updateClock() {
-  const now = new Date();
-  const use24 = state.settings?.interface?.clock24h !== false;
-  const time = now.toLocaleTimeString('fr-FR', {
-    hour: '2-digit', minute: '2-digit',
-    hour12: !use24,
-  });
-  document.getElementById('header-clock').textContent = time;
-  document.getElementById('header-date').textContent = now.toLocaleDateString('fr-FR', {
-    weekday: 'long', day: 'numeric', month: 'short',
-  });
-}
-setInterval(updateClock, 1000);
-updateClock();
-
-// ─── NOTIFICATION ─────────────────────────────────────────────────────────────
-let notifTimeout;
-function notify(icon, text, sub = '', duration = 3000) {
-  const el = document.getElementById('notification');
-  document.getElementById('notif-icon').textContent = icon;
-  document.getElementById('notif-text').textContent = text;
-  document.getElementById('notif-sub').textContent = sub;
-  el.classList.add('show');
-  clearTimeout(notifTimeout);
-  notifTimeout = setTimeout(() => el.classList.remove('show'), duration);
-}
-
-// ─── SKELETON GRID ────────────────────────────────────────────────────────────
-(function genSkeletons() {
-  const grid = document.getElementById('skeleton-grid');
-  for (let i = 0; i < 12; i++) {
-    const d = document.createElement('div');
-    d.className = 'skeleton skeleton-card';
-    d.style.animationDelay = (i * 0.07) + 's';
-    grid.appendChild(d);
-  }
-})();
-
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-async function doRefresh() {
+function closeSettings(){document.getElementById('settings').classList.remove('on');}
+function saveSettings(){
+  const newUrl=document.getElementById('m3u-input').value.trim()||DEFAULT_M3U;
+  const urlChanged=newUrl!==S.m3uUrl;
+  S.m3uUrl=newUrl; LS.s('m3u',S.m3uUrl);
+  S.showLogos=document.getElementById('show-logos').checked; LS.s('logos',S.showLogos);
+  S.pageSize=+document.getElementById('page-size').value; LS.s('psize',S.pageSize);
+  S.vol=+document.getElementById('init-vol').value; LS.s('vol',S.vol);
+  document.getElementById('vol').value=S.vol;
+  document.getElementById('vol-display').textContent=S.vol;
+  document.getElementById('video-el').volume=S.vol/100;
   closeSettings();
-  notify('↻', 'Actualisation', 'Chargement des chaînes...');
-  if (IS_SERVER_MODE) await api('/api/refresh', { method: 'POST' });
-  await loadChannels();
-  notify('✓', 'Actualisé', `${state.channels.length} chaînes chargées`);
+  if(urlChanged){S.channels=[];S.page=0;showMsg('Chargement nouvelle source...');loadM3U(S.m3uUrl);}
+  else{renderPage();}
+  notify('Paramètres sauvegardés');
+}
+function setPreset(url){document.getElementById('m3u-input').value=url;}
+document.getElementById('settings').addEventListener('click',e=>{
+  if(e.target===document.getElementById('settings'))closeSettings();
+});
+
+// ─── HORLOGE ──────────────────────────────────────────────────────────
+function startClock(){
+  const cl=document.getElementById('clock');
+  function tick(){
+    const n=new Date();
+    cl.textContent=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');
+  }
+  tick();
+  // Intervalle de 30s (pas 1s) = moins de travail pour le Pi
+  setInterval(tick,30000);
 }
 
-async function clearCache() {
-  LS.set('settings', null);
-  notify('🗑', 'Cache vidé', 'Les données en cache ont été supprimées');
+// ─── CHARGEMENT HLS.JS (asynchrone, non bloquant) ─────────────────────
+// Chargé après le boot pour ne pas bloquer l'affichage initial
+function loadHLS(cb) {
+  if (typeof Hls !== 'undefined') { cb(); return; }
+  const s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.light.min.js'; // version LIGHT
+  s.onload=cb; s.onerror=cb; // cb() même en erreur : fallback natif
+  document.head.appendChild(s);
 }
 
-async function applyM3UUrl() {
-  const input = document.getElementById('m3u-url-input');
-  if (!input) return;
-  const url = input.value.trim();
-  if (!url) return;
-  if (!state.settings) state.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-  if (!state.settings.iptv) state.settings.iptv = {};
-  state.settings.iptv.m3uUrl = url;
-  LS.set('settings', state.settings);
-  closeSettings();
-  notify('↻', 'Changement de source M3U', url.slice(0, 50) + '...');
-  state.channels = [];
-  renderView();
-  await loadM3UDirect(url);
-}
-
-// ─── INIT ─────────────────────────────────────────────────────────────────────
-runBoot();
+// ─── INIT ─────────────────────────────────────────────────────────────
+// Pré-charge HLS.js en parallèle du boot (non bloquant)
+loadHLS(()=>{ console.log('HLS.js prêt'); });
+boot();
 </script>
 </body>
 </html>
