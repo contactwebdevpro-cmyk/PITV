@@ -1200,7 +1200,7 @@ async function runBoot() {
   await loadSettings();
 
   // Load channels
-  status.textContent = 'Chargement des chaînes IPTV...';
+  status.textContent = 'Chargement des chaînes...';
   await loadChannels();
 
   fill.style.width = '100%';
@@ -1320,7 +1320,7 @@ async function loadM3UDirect(url) {
   for (let i = 0; i < urlsToTry.length; i++) {
     const fetchUrl = urlsToTry[i];
     const label = (i === 0 && !needProxy) ? 'directe' : `proxy ${i + (needProxy ? 1 : 0)}`;
-    setStatus(`Chargement ${label}...`);
+    setStatus('Chargement des chaînes...');
 
     try {
       const controller = new AbortController();
@@ -1388,7 +1388,7 @@ async function loadM3UDirect(url) {
                 renderCategories();
                 loadFavorites().then(() => {});
                 renderView();
-                setStatus(`${channels.length} chaînes chargées, suite en cours...`);
+                setStatus(`${channels.length} chaînes chargées, chargement en cours...`);
               }
             }
           }
@@ -1419,16 +1419,35 @@ async function loadM3UDirect(url) {
 
     } catch (e) {
       lastError = e;
-      console.warn(`Tentative ${label} échouée :`, e.message);
+      console.warn(`Tentative ${i + 1}/${urlsToTry.length} échouée :`, e.message);
     }
   }
 
-  // Échec total
+  // Échec total — retry automatique après 8 secondes
+  console.warn('Toutes les tentatives ont échoué, retry dans 8s...');
+
+  // Affiche quand même l'interface (vide) pendant qu'on retente
   state.channels = [];
   renderCategories();
   await loadFavorites();
   renderView();
-  notify('⚠️', 'Chargement échoué', 'Changez la source M3U dans ⚙ Paramètres > Système');
+
+  // Notif discrète et retry silencieux
+  notify('↻', 'Chargement des chaînes...', 'Nouvelle tentative en cours');
+
+  // Retry automatique jusqu'à 5 fois avec délai croissant
+  if ((loadM3UDirect._retryCount || 0) < 5) {
+    loadM3UDirect._retryCount = (loadM3UDirect._retryCount || 0) + 1;
+    const delay = Math.min(5000 * loadM3UDirect._retryCount, 30000);
+    setTimeout(async () => {
+      await loadM3UDirect(url);
+      if (state.channels.length > 0) loadM3UDirect._retryCount = 0;
+    }, delay);
+  } else {
+    // Abandon après 5 tentatives
+    loadM3UDirect._retryCount = 0;
+    notify('⚠️', 'Chargement échoué', 'Vérifiez votre connexion ou changez la source M3U dans ⚙ Paramètres');
+  }
 }
 
 // ─── PARSEUR M3U INTÉGRÉ ──────────────────────────────────────────────────────
