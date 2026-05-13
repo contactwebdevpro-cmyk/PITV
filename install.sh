@@ -57,7 +57,7 @@ fi
 if grep -q "Raspberry Pi" /proc/cpuinfo 2>/dev/null; then
   IS_PI=true
   PI_MODEL=$(grep "Model" /proc/cpuinfo | tail -1 | cut -d: -f2 | xargs)
-  ok "Raspberry Pi détecté : ${PI_MODEL}"
+  ok " v3 Raspberry Pi détecté : ${PI_MODEL}"
 else
   IS_PI=false
   ok "Matériel : $(uname -m)"
